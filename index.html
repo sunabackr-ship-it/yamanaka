@@ -222,6 +222,7 @@
       <button class="ovbtn" id="pauseBack" style="background:#3f5a3a;">← 戻って続ける</button>
       <button class="ovbtn" id="pauseSuspend" style="background:#4a3f22;">中断する<small>いまの備えを残して最初の画面へ。あとで「続きから」で再開できます</small></button>
       <button class="ovbtn" id="pauseRestart" style="background:#5a3a2a;">最初からやり直す<small>同じ難易度で第1波から。いまの備えは消えます</small></button>
+      <button class="ovbtn" id="pauseGiveup" style="background:#6b3630;">難易度を選び直す<small>この戦いは終わりにして最初の画面へ。続きは残りません</small></button>
     </div>
     <div class="ov" id="introOv">
       <div id="titleLogo">
@@ -1020,6 +1021,12 @@ g('pauseRestart').onclick=()=>{
   g('pauseOv').classList.remove('on');
   resetBoard(); phase='shop'; writeSave(); refresh();
   flash('第1波から やり直し');
+};
+g('pauseGiveup').onclick=()=>{
+  if(!confirm('いまの戦い（第'+wave+'波）を終わりにして、難易度から選び直します。\n続きは残りません。よろしいですか？')) return;
+  g('pauseOv').classList.remove('on');
+  clearSave();                        // 続きを消すので、タイトルで難易度を選んでも確認は出ない
+  toTitle();
 };
 g('overTitle').onclick=toTitle;
 
