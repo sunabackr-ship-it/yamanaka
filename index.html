@@ -88,9 +88,9 @@
   .diffbtn .bestline.has { opacity:1; color:#ffd66b; }
   #overOv .newrec { color:#ffd66b; font-weight:bold; font-size:15px;
     text-shadow:0 0 14px rgba(255,214,107,.8); }
-  #winReplayRow { margin-top:12px; display:flex; gap:6px; align-items:center; justify-content:center; flex-wrap:wrap; }
-  #winReplayRow .wrlbl { font-size:11px; color:#cbb98a; opacity:.85; }
-  .wrbtn { padding:6px 12px; font-size:12px; font-weight:bold; background:#4a3f22; color:#ffe9ad; border:1px solid #6b5a34; border-radius:6px; cursor:pointer; }
+  #winReplayRow { margin:12px auto 0; max-width:440px; width:100%; display:flex; gap:6px; align-items:center; justify-content:center; flex-wrap:wrap; }
+  #winReplayRow .wrlbl { flex:1 0 100%; text-align:center; font-size:11px; color:#cbb98a; opacity:.85; }
+  .wrbtn { flex:1 1 0; min-width:0; padding:8px 4px; font-size:12px; font-weight:bold; background:#4a3f22; color:#ffe9ad; border:1px solid #6b5a34; border-radius:6px; cursor:pointer; white-space:nowrap; }
   .wrbtn:disabled { opacity:.38; cursor:default; font-weight:normal; }
   #clearBest { margin-top:10px; padding:6px 10px; font-size:11px; background:transparent;
     color:#8f7f63; border:1px solid #4a3f22; border-radius:5px; cursor:pointer; }
@@ -104,12 +104,12 @@
   /* インラインopacityは登場演出のopacity:0に勝ってしまうので、この注記はクラスで指定する */
   #introOv .prenote { font-size:11px; opacity:.7; }
   /* オープニング明けの登場演出：黒幕の上でロゴだけ浮かび、定位置へ上がってから画面が出る */
-  #introOv::before { content:""; position:fixed; inset:0; background:#000; opacity:0; pointer-events:none; transition:opacity .8s ease; }
+  #introOv::before { content:""; position:fixed; inset:0; background:#000; opacity:0; pointer-events:none; transition:none; }
   #introOv.enter::before { opacity:1; }
-  #introOv.enter.reveal::before { opacity:0; }
+  #introOv.enter.reveal::before { opacity:0; transition:opacity .8s ease; }
   #introOv.enter > * { position:relative; z-index:1; }
-  #introOv.enter > :not(#titleLogo) { opacity:0; pointer-events:none; transition:opacity .6s ease; }
-  #introOv.enter.reveal > :not(#titleLogo) { opacity:var(--rvop,1); }
+  #introOv.enter > :not(#titleLogo) { opacity:0; pointer-events:none; transition:none; }
+  #introOv.enter.reveal > :not(#titleLogo) { opacity:var(--rvop,1); transition:opacity .6s ease; }
   /* revealの戻り先は各要素の本来の透明度に合わせる（終了時にポンと変わるのを防ぐ） */
   #introOv h2 { --rvop:.9; }
   #introOv p { --rvop:.92; }
