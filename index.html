@@ -264,7 +264,7 @@
       </svg>
       <button id="introZukan" style="width:100%;max-width:440px;margin:10px 0 2px;padding:11px;font-size:14px;font-weight:bold;background:#7a6320;color:#ffe9ad;border:1px solid #ffd66b;border-radius:6px;cursor:pointer;">📖 先に「山中城のはなし」を読む</button>
       <p class="prenote">寄せ手の数はどの難易度でも史実どおり6万7千。変わるのは寄せ手の手強さだけ。<br>難易度を選んで開戦：</p>
-      <button class="diffbtn" data-g="1.17">イージー<small>練度は低め。まず流れを掴む</small></button>
+      <button class="diffbtn" data-g="1.14">イージー<small>練度は低め。櫓を並べれば守り切れる</small></button>
       <button class="diffbtn" data-g="1.20">ノーマル<small>手強い。最終波が壁</small></button>
       <button class="diffbtn" data-g="1.23">ハード<small>精鋭ぞろい。仕掛けを使いこなせ</small></button>
       <div id="winReplayRow"><span class="wrlbl">勝どき（かちどき）をもう一度：</span><button class="wrbtn" data-t="0">イージー</button><button class="wrbtn" data-t="1">ノーマル</button><button class="wrbtn" data-t="2">ハード</button></div>
@@ -301,8 +301,8 @@
     </div>
     <div class="row">
       <div class="lbl">堀</div>
-      <div class="btn" data-tool="hori">障子堀<small>20・激減速</small></div>
-      <div class="btn" data-tool="une">畝堀<small>12・減速</small></div>
+      <div class="btn" data-tool="hori">障子堀<small>16・激減速</small></div>
+      <div class="btn" data-tool="une">畝堀<small>9・減速</small></div>
     </div>
     <div class="row">
       <div class="lbl">強化</div>
@@ -480,11 +480,12 @@ const waveHP = w => Math.round(3*Math.pow(G,w-1)) + Math.floor(w/4);
 const waveSP = w => Math.min(0.046, 0.017 + 0.0014*w);
 const TOWER = { yagura:{cost:30,cd:32,dmg:1,rmul:1.0,col:'#6b4a2a',cap:'#caa46a'},
                 gun:{cost:70,cd:64,dmg:5,rmul:0.92,col:'#4a3550',cap:'#b08fce'} };
-const costDmg = t => Math.round(35*Math.pow(1.32,t));
+const DMG_STEP=0.5;                                  // 1段あたりの威力。1だと1段で火力2倍になり崖ができる
+const costDmg = t => Math.round(20*Math.pow(1.22,t));
 const costCd  = t => Math.round(70*Math.pow(1.5,t));
 const costRng = t => Math.round(60*Math.pow(1.5,t));
 const CD_CAP=5, RNG_CAP=4;
-const HORI={cost:20,f:0.13}, UNE={cost:12,f:0.35};
+const HORI={cost:16,f:0.10}, UNE={cost:9,f:0.25};   // fは速度係数（小さいほど強く止める）
 const COST_DEMARU=60, COST_UMADASHI=50, COST_TATEBORI=45, COST_BRIDGE=40;
 const COST_BRIDGE_FIX=10, BRIDGE_FALLS=6;  // 復旧費 / 一度落として堀へ落とせる人数（シミュで確定）
 let G=1.20; // 難易度（開戦時に設定）
@@ -747,7 +748,7 @@ function ptAt(t){ const seg=Math.min(Math.floor(t),PATH.length-2),f=t-seg;
   const a=PATH[seg],b=PATH[seg+1];
   return [(a[0]+(b[0]-a[0])*f)*CELL+CELL/2,(a[1]+(b[1]-a[1])*f)*CELL+CELL/2]; }
 function eff(t){ const b=TOWER[t.type];
-  return { dmg:b.dmg+upg.dmg, rcd:Math.max(6,Math.round(b.cd*Math.pow(0.82,upg.cd))),
+  return { dmg:b.dmg+upg.dmg*DMG_STEP, rcd:Math.max(6,Math.round(b.cd*Math.pow(0.82,upg.cd))),
            rng:RANGE*b.rmul*Math.pow(1.15,upg.rng) }; }
 
 function step(){
