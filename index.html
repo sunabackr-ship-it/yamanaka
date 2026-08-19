@@ -399,7 +399,7 @@ function tone(t0,peak,decay,type,f1,f2,attack){
   o.start(t0); o.stop(t0+decay+0.05); return o;
 }
 // 同じ音が重なりすぎないよう最短間隔をあける（発射・撃破は毎フレーム起こりうる）
-const sndLast={}, SND_GAP={bow:45, gun:60, kill:35};
+const sndLast={}, SND_GAP={bow:45, gun:60, kill:35, fall:70, tap:40};
 function playSE(name){
   if(!sndOn) return;
   const a=audioInit(); if(!a||a.state==='suspended') return;
@@ -414,7 +414,7 @@ function playSE(name){
       noise(t,0.22,0.11,'lowpass',900);
       tone(t,0.20,0.10,'sine',110,42); break;
     case 'kill':                                  // 退けた：控えめなトスッ
-      noise(t,0.16,0.05,'lowpass',900); break;
+      noise(t,0.24,0.05,'lowpass',900); break;
     case 'build':                                 // 建てる：木槌のトン
       tone(t,0.16,0.13,'triangle',210,150);
       noise(t,0.07,0.03,'bandpass',1300,4); break;
@@ -429,6 +429,31 @@ function playSE(name){
       const sc=[392,440,523.25];                  // ソ・ラ・ド
       sc.forEach((f,i)=> tone(t+i*0.085,0.14,0.30,'triangle',f,f,0.006));
       break; }
+    case 'tap':                                   // 選ぶ：ごく小さいカチッ
+      noise(t,0.19,0.022,'bandpass',2600,1.5); break;
+    case 'ghost':                                 // 仮置き：tapより更に小さいコッ
+      noise(t,0.08,0.022,'lowpass',1500);
+      tone(t,0.05,0.022,'triangle',520,470); break;
+    case 'deny':                                  // 置けない・石高不足：短い否定音
+      tone(t,0.14,0.09,'square',196,155,0.006);
+      tone(t+0.075,0.12,0.09,'square',165,131,0.006); break;
+    case 'undo':                                  // 撤去・一手戻す：引く音＋石高が戻る
+      noise(t,0.10,0.07,'bandpass',1000,1.4);
+      tone(t+0.05,0.10,0.16,'triangle',740,880,0.005); break;
+    case 'upg': {                                 // 強化：キラッと駆け上がる
+      const sc=[523.25,659.25,783.99,1046.5];     // ド・ミ・ソ・ド
+      sc.forEach((f,i)=> tone(t+i*0.05,0.10,0.22,'triangle',f,f,0.004));
+      break; }
+    case 'drop':                                  // 落とし橋：木が外れて落ちる
+      tone(t,0.26,0.30,'sine',180,48,0.005);
+      noise(t,0.20,0.16,'lowpass',700);
+      noise(t+0.06,0.10,0.10,'bandpass',300,1.2); break;
+    case 'fall':                                  // 堀へ落ちる：ドサッと土に沈む
+      noise(t,0.14,0.10,'lowpass',420);
+      tone(t,0.09,0.09,'sine',120,62,0.004); break;
+    case 'filled':                                // 橋が埋まる：ズズッと詰まる
+      noise(t,0.13,0.34,'lowpass',300);
+      tone(t,0.10,0.30,'sine',96,70,0.02); break;
   }
 }
 function updateSoundBtns(){
@@ -594,17 +619,17 @@ function place(px,py){
   const key=c+','+r;
   if(tool==='del'){ ghost=null; // 撤去は即・全額戻る
     const ti=towers.findIndex(t=>t.c===c&&t.r===r);
-    if(ti>=0){ gold+=TOWER[towers[ti].type].cost; towers.splice(ti,1); lastAction=null; refresh(); return; }
-    if(hori[key]){ gold+=hori[key].cost; delete hori[key]; lastAction=null; refresh(); return; }
+    if(ti>=0){ gold+=TOWER[towers[ti].type].cost; towers.splice(ti,1); lastAction=null; playSE('undo'); refresh(); return; }
+    if(hori[key]){ gold+=hori[key].cost; delete hori[key]; lastAction=null; playSE('undo'); refresh(); return; }
     return;
   }
   // 築城・堀は「狙う→もう一度で確定」の2段階（誤タップで課金しない）
   const err=placeError(c,r,tool);
-  if(err){ ghost=null; flash(err); refresh(); return; }
+  if(err){ ghost=null; playSE('deny'); flash(err); refresh(); return; }
   if(ghost && ghost.c===c && ghost.r===r && ghost.tool===tool){
     commitPlace(c,r,tool); ghost=null; refresh();
   } else {
-    ghost={c,r,tool}; flash('ここでいい？ もう一度タップで確定'); refresh();
+    ghost={c,r,tool}; playSE('ghost'); flash('ここでいい？ もう一度タップで確定'); refresh();
   }
 }
 function pos(e){ const rc=cv.getBoundingClientRect(), sx=cv.width/rc.width;
@@ -644,16 +669,17 @@ cv.addEventListener('touchstart',e=>{e.preventDefault();const[x,y]=pos(e);tap(x,
 
 document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>{
   if(phase!=='shop') return;
+  playSE('tap');
   document.querySelectorAll('[data-tool]').forEach(x=>x.classList.remove('sel'));
   b.classList.add('sel'); tool=b.dataset.tool; ghost=null;
 });
 // 強化
 g('upDmg').onclick=()=>{ if(phase!=='shop')return; const c=costDmg(upg.dmg);
-  if(gold<c){flash('石高が足りない');return;} gold-=c; upg.dmg++; upgFlash=40; flash('威力 強化！ 矢が重くなった（Lv'+upg.dmg+'）'); refresh(); };
+  if(gold<c){playSE('deny');flash('石高が足りない');return;} gold-=c; upg.dmg++; upgFlash=40; playSE('upg'); flash('威力 強化！ 矢が重くなった（Lv'+upg.dmg+'）'); refresh(); };
 g('upCd').onclick=()=>{ if(phase!=='shop')return; if(upg.cd>=CD_CAP){flash('連射は上限');return;} const c=costCd(upg.cd);
-  if(gold<c){flash('石高が足りない');return;} gold-=c; upg.cd++; upgFlash=40; flash('連射 強化！ 撃つ間隔が縮まった（Lv'+upg.cd+'）'); refresh(); };
+  if(gold<c){playSE('deny');flash('石高が足りない');return;} gold-=c; upg.cd++; upgFlash=40; playSE('upg'); flash('連射 強化！ 撃つ間隔が縮まった（Lv'+upg.cd+'）'); refresh(); };
 g('upRng').onclick=()=>{ if(phase!=='shop')return; if(upg.rng>=RNG_CAP){flash('射程は上限');return;} const c=costRng(upg.rng);
-  if(gold<c){flash('石高が足りない');return;} gold-=c; upg.rng++; upgFlash=40; flash('射程 強化！ 狙える輪が広がった（Lv'+upg.rng+'）'); refresh(); };
+  if(gold<c){playSE('deny');flash('石高が足りない');return;} gold-=c; upg.rng++; upgFlash=40; playSE('upg'); flash('射程 強化！ 狙える輪が広がった（Lv'+upg.rng+'）'); refresh(); };
 // 普請
 g('stDemaru').onclick=()=>{ if(phase!=='shop'||struct.demaru)return;
   if(gold<COST_DEMARU){flash('石高が足りない');return;}
@@ -673,6 +699,7 @@ g('stBridge').onclick=()=>{ if(phase!=='shop')return; if(bridgeArmed){flash('落
 
 // 早送り / 落とし橋
 document.querySelectorAll('.ff').forEach(b=>b.onclick=()=>{
+  playSE('tap');
   document.querySelectorAll('.ff').forEach(x=>x.classList.remove('sel'));
   b.classList.add('sel'); speed=parseInt(b.dataset.sp); });
 g('drop').onclick=()=>{
@@ -682,10 +709,11 @@ g('drop').onclick=()=>{
   for(const e of enemies){ if(e.dead||bridgeFalls<=0) continue;
     if(e.t>=BRIDGE_IDX){ e.dead=true; bridgeFalls--; bridgeFell++; countFall(e); } }
   if(bridgeFalls<=0) bridgeDown=false;
+  playSE('drop');
   flash('落とし橋！ 橋が堀へ落ちた（あと'+bridgeFalls+'兵まで落とせる）'); refresh();
 };
 // 堀へ落ちた敵も「撃退した寄せ手」として数える（石高は入らない＝火力ではなく仕掛けの戦果）
-function countFall(e){ bumpKill(); }
+function countFall(e){ playSE('fall'); bumpKill(); }
 function bumpKill(){ killed++; repelled=soldiersOf(killed); checkHalf(); }
 const enemyGone = () => soldiersOf(killed+leaked);          // 盤から消えた寄せ手（撃退＋突破）
 const enemyLeft = () => Math.max(0, TOTAL_SOLDIERS-enemyGone());
@@ -693,7 +721,7 @@ function checkHalf(){ if(!halfFlag && enemyGone()>=HALF){ halfFlag=true; flash('
 
 // 戦闘開始
 g('undo').onclick=()=>{
-  if(phase!=='shop'||!lastAction){ flash('戻せる手がありません'); return; }
+  if(phase!=='shop'||!lastAction){ playSE('deny'); flash('戻せる手がありません'); return; }
   let removed=false;
   if(lastAction.type==='tower'){
     const i=towers.findIndex(t=>t.c===lastAction.c&&t.r===lastAction.r);
@@ -702,8 +730,8 @@ g('undo').onclick=()=>{
     const k=lastAction.c+','+lastAction.r;
     if(hori[k]){ delete hori[k]; removed=true; }
   }
-  if(!removed){ lastAction=null; ghost=null; flash('戻せる手がありません'); refresh(); return; }
-  gold+=lastAction.cost; lastAction=null; ghost=null; flash('一手戻した（返金）'); refresh();
+  if(!removed){ lastAction=null; ghost=null; playSE('deny'); flash('戻せる手がありません'); refresh(); return; }
+  gold+=lastAction.cost; lastAction=null; ghost=null; playSE('undo'); flash('一手戻した（返金）'); refresh();
 };
 g('start').onclick=()=>{
   if(phase!=='shop') return;
@@ -736,7 +764,7 @@ function step(){
     let nt=e.t+e.sp*s;
     if(bridgeDown && e.t<BRIDGE_IDX && nt>=BRIDGE_IDX){   // 橋を渡ろうとした瞬間に堀へ
       e.dead=true; bridgeFalls--; bridgeFell++; countFall(e);
-      if(bridgeFalls<=0){ bridgeDown=false; flash('橋が埋まった…寄せ手が渡り始める'); }
+      if(bridgeFalls<=0){ bridgeDown=false; playSE('filled'); flash('橋が埋まった…寄せ手が渡り始める'); }
       refresh();   // 「あと何兵落とせるか」のボタン表示を追従させる
       continue; }
     e.t=nt; const p=ptAt(e.t); if(p[0]<e.x-0.3)e.faceLeft=true; else if(p[0]>e.x+0.3)e.faceLeft=false; e.x=p[0]; e.y=p[1];
