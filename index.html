@@ -199,7 +199,7 @@
   </div>
 
   <div id="msg"></div>
-  <div class="hint" id="hint">緑の空きマスに櫓、茶の道に堀。櫓は最大8基（岱崎出丸で+2）。普請（だいさきでまる／まるうまだし／たてぼり）は敵を迂回させ、長く射線に晒す。落とし橋は交戦中の切り札。落とすとその波の間、渡ろうとした寄せ手を6兵まで堀へ落とす。次の波では安く架け直せる。※背景画像は後で差し込み可。</div>
+  <div class="hint" id="hint">緑の空きマスに櫓、茶の道に堀。櫓は石高の続くかぎり何基でも築ける（ただし序盤は数を増やすより威力強化が効く。石高が余る終盤に櫓を並べて盤を埋めるとよい）。普請（だいさきでまる／まるうまだし／たてぼり）は敵を迂回させ、長く射線に晒す。落とし橋は交戦中の切り札。落とすとその波の間、渡ろうとした寄せ手を6兵まで堀へ落とす。次の波では安く架け直せる。※背景画像は後で差し込み可。</div>
 </div>
 <script>
 const COLS=9, ROWS=7, CELL=52;
@@ -217,7 +217,7 @@ function applyBg(id,key){var el=document.getElementById(id);if(!IMG_DATA[key])re
 
 
 // ---------- バランス（シミュ確定）----------
-const START=90, ALLIES_MAX=4000, LEAK_COST=400, KILL=2, CAP_BASE=8, LAST=20;
+const START=90, ALLIES_MAX=4000, LEAK_COST=400, KILL=2, LAST=20;  // 櫓の基数制限は撤廃（石高が実質の上限）
 const TOTAL_SOLDIERS=67000, TOTAL_SPRITES=350, HALF=33500;  // 史実の寄せ手。1体≒191人（350体でちょうど67000に着地）
 const soldiersOf = k => Math.round(k*TOTAL_SOLDIERS/TOTAL_SPRITES);
 const RANGE=CELL*2.2, PSPD=7, HIT=8, SPAWN_INT=40;
@@ -245,7 +245,7 @@ const ZUKAN=[
  {n:'丸馬出',r:'まるうまだし',img:'umadashi',t:'虎口（こぐち＝城の出入口）の前に置いた、丸く張り出した防御施設。敵は真っ直ぐ門へ進めず、弧を描いて回り込むことになる。その間ずっと守り手の射線に晒される。北条・武田系の城でよく使われた技法。'},
  {n:'落とし橋',r:'おとしばし',img:'bridge',t:'本丸の西にかかる木の橋。いざという時に橋を堀へ落とし、本丸への道を断つ仕掛け。渡ろうとした寄せ手は堀へ落ちる。ただし橋が落ちたままでは味方も動けず、堀が埋まれば敵はまた渡り始める。'},
  {n:'本丸',r:'ほんまる',img:'keep',t:'山頂に置かれた城の中心。広さおよそ1000㎡を土塁（どるい）と堀で囲む。物見台や櫓（やぐら）があったとされ、晴れた日には富士山を望む。ここを突かれることが「落城」を意味する。'},
- {n:'弓櫓',r:'ゆみやぐら',img:'yagura',t:'矢を速射する櫓。一本の威力は小さいが手数が多く、数をそろえるほど効く。連射と射程の強化がよく効く。'},
+ {n:'弓櫓',r:'ゆみやぐら',img:'yagura',t:'矢を速射する櫓。一本の威力は小さいが手数が多い。基数に上限はなく、石高の続くかぎり築ける。ただし道に近い良い場所から埋まっていくので、序盤は数を増やすより威力を上げるほうが効く。石高が余ってくる終盤に、盤を櫓で埋めていくのが強い。'},
  {n:'鉄砲櫓',r:'てっぽうやぐら',img:'gun',t:'火縄銃を据えた櫓。撃つ間隔は長いが一発が重く、守りの固い寄せ手に強い。弓櫓と組み合わせると穴が埋まる。'},
  {n:'寄せ手',r:'よせて',img:'ashigaru',t:'攻め寄せる豊臣方の足軽（あしがる）。旗印は豊臣の五七桐（ごしちのきり）。このゲームでは1体がおよそ191人の隊にあたり、全20波で史実どおりの6万7千になる。波を追うごとに手強くなる。'},
 ];
@@ -294,10 +294,11 @@ let towers=[], hori={}, upg={dmg:0,cd:0,rng:0};
 let struct={demaru:false,umadashi:false,tatebori:false};
 let bridgeArmed=false, bridgeBuilt=false, bridgeDown=false, bridgeFalls=0, bridgeFell=0;
 let ghost=null, lastAction=null;
+let upgFlash=0;   // 強化した瞬間、全櫓から輪が広がる演出のカウンタ
 let enemies=[], projectiles=[], spawnLeft=0, spawnTimer=0, speed=1, deCd=0;
 
 const g=id=>document.getElementById(id);
-function capTotal(){ return CAP_BASE + (struct.demaru?2:0); }
+function capTotal(){ return Infinity; }   // 撤廃済み。呼び出し側の互換のため残す
 struct={demaru:false,umadashi:false,tatebori:false}; rebuildPath();
 
 // ---------- 難易度選択→開戦 ----------
@@ -336,7 +337,6 @@ function placeError(c,r,tl){
     if(onPath(c,r)) return '道の上には櫓を築けない';
     if(isDetour(c,r)) return '普請予定地には築けない';
     if(towers.some(t=>t.c===c&&t.r===r)) return 'もう建っている';
-    if(towers.length>=capTotal()) return '櫓は最大'+capTotal()+'基';
     if(gold<TOWER[tl].cost) return '石高が足りない';
   } else if(tl==='hori'||tl==='une'){
     const S=tl==='hori'?HORI:UNE;
@@ -420,11 +420,11 @@ document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>{
 });
 // 強化
 g('upDmg').onclick=()=>{ if(phase!=='shop')return; const c=costDmg(upg.dmg);
-  if(gold<c){flash('石高が足りない');return;} gold-=c; upg.dmg++; flash('威力 強化！'); refresh(); };
+  if(gold<c){flash('石高が足りない');return;} gold-=c; upg.dmg++; upgFlash=40; flash('威力 強化！ 矢が重くなった（Lv'+upg.dmg+'）'); refresh(); };
 g('upCd').onclick=()=>{ if(phase!=='shop')return; if(upg.cd>=CD_CAP){flash('連射は上限');return;} const c=costCd(upg.cd);
-  if(gold<c){flash('石高が足りない');return;} gold-=c; upg.cd++; flash('連射 強化！'); refresh(); };
+  if(gold<c){flash('石高が足りない');return;} gold-=c; upg.cd++; upgFlash=40; flash('連射 強化！ 撃つ間隔が縮まった（Lv'+upg.cd+'）'); refresh(); };
 g('upRng').onclick=()=>{ if(phase!=='shop')return; if(upg.rng>=RNG_CAP){flash('射程は上限');return;} const c=costRng(upg.rng);
-  if(gold<c){flash('石高が足りない');return;} gold-=c; upg.rng++; flash('射程 強化！'); refresh(); };
+  if(gold<c){flash('石高が足りない');return;} gold-=c; upg.rng++; upgFlash=40; flash('射程 強化！ 狙える輪が広がった（Lv'+upg.rng+'）'); refresh(); };
 // 普請
 g('stDemaru').onclick=()=>{ if(phase!=='shop'||struct.demaru)return;
   if(gold<COST_DEMARU){flash('石高が足りない');return;}
@@ -508,7 +508,7 @@ function step(){
   for(const t of towers){ t.cd--; if(t.cd>0)continue; const E=eff(t);
     const tx=t.c*CELL+CELL/2, ty=t.r*CELL+CELL/2; let tgt=null,bd=1e9;
     for(const e of enemies){ const d=Math.hypot(e.x-tx,e.y-ty); if(d<E.rng&&d<bd){bd=d;tgt=e;} }
-    if(tgt){ projectiles.push({x:tx,y:ty,tgt,dmg:E.dmg}); t.cd=E.rcd; } }
+    if(tgt){ projectiles.push({x:tx,y:ty,tgt,dmg:E.dmg}); t.cd=E.rcd; t.flash=5; } }
   if(struct.demaru){ deCd--; if(deCd<=0){ const tx=1*CELL+CELL/2, ty=3*CELL+CELL/2; let tgt=null,bd=1e9;
     for(const e of enemies){ const d=Math.hypot(e.x-tx,e.y-ty); if(d<RANGE*1.15&&d<bd){bd=d;tgt=e;} }
     if(tgt){ projectiles.push({x:tx,y:ty,tgt,dmg:2}); deCd=30; } } }
@@ -557,14 +557,14 @@ g('retry').onclick=()=>{
 function refresh(){
   g('gold').textContent=gold;
   g('phase').textContent = phase==='battle'?('第'+wave+'/'+LAST+'波 交戦中')
-    : phase==='over'?'決着' : (phase==='intro'||phase==='opening')?'開戦前' : ('第'+wave+'/'+LAST+'波 の備え（櫓 '+towers.length+'/'+capTotal()+'）');
+    : phase==='over'?'決着' : (phase==='intro'||phase==='opening')?'開戦前' : ('第'+wave+'/'+LAST+'波 の備え（櫓 '+towers.length+'基）');
   g('start').textContent='攻め手を迎え撃つ（第'+wave+'波）';
   g('allyFill').style.width=(100*allies/ALLIES_MAX)+'%'; g('allyLbl').textContent=allies;
   const rep=Math.min(repelled,TOTAL_SOLDIERS);
   g('repFill').style.width=(100*rep/TOTAL_SOLDIERS)+'%'; g('repLbl').textContent=rep+' / '+TOTAL_SOLDIERS;
-  setBtn('upDmg','威力','+'+(upg.dmg+1)+' '+costDmg(upg.dmg)+'石', gold>=costDmg(upg.dmg), false);
-  setBtn('upCd','連射', upg.cd>=CD_CAP?'MAX':(costCd(upg.cd)+'石'), gold>=costCd(upg.cd)&&upg.cd<CD_CAP, upg.cd>=CD_CAP);
-  setBtn('upRng','射程', upg.rng>=RNG_CAP?'MAX':(costRng(upg.rng)+'石'), gold>=costRng(upg.rng)&&upg.rng<RNG_CAP, upg.rng>=RNG_CAP);
+  setBtn('upDmg','威力 Lv'+upg.dmg,'次で+'+(upg.dmg+1)+'　'+costDmg(upg.dmg)+'石', gold>=costDmg(upg.dmg), false);
+  setBtn('upCd','連射 Lv'+upg.cd, upg.cd>=CD_CAP?'これ以上なし':(costCd(upg.cd)+'石'), gold>=costCd(upg.cd)&&upg.cd<CD_CAP, upg.cd>=CD_CAP);
+  setBtn('upRng','射程 Lv'+upg.rng, upg.rng>=RNG_CAP?'これ以上なし':(costRng(upg.rng)+'石'), gold>=costRng(upg.rng)&&upg.rng<RNG_CAP, upg.rng>=RNG_CAP);
   setBtn('stDemaru','岱崎出丸', struct.demaru?'普請済':(COST_DEMARU+'石·自動弓'), gold>=COST_DEMARU&&!struct.demaru, struct.demaru);
   setBtn('stUmadashi','丸馬出', struct.umadashi?'普請済':(COST_UMADASHI+'石·足止'), gold>=COST_UMADASHI&&!struct.umadashi, struct.umadashi);
   setBtn('stTatebori','竪堀', struct.tatebori?'普請済':(COST_TATEBORI+'石·強足止'), gold>=COST_TATEBORI&&!struct.tatebori, struct.tatebori);
@@ -612,18 +612,42 @@ function draw(){
   if(struct.demaru) drawStruct('demaru', 1.0*CELL, 3*CELL+2, 2.3);
   if(struct.umadashi) drawStruct('umadashi', 2.0*CELL, 1*CELL+2, 2.3);
   if(struct.tatebori) drawStruct('tatebori', 8.0*CELL, 3*CELL+2, 1.7);
+  // 射程の輪：常時出すと櫓が増えたとき煩いので、強化した直後だけ全櫓に出す
+  if(upgFlash>0 && towers.length){
+    ctx.save(); ctx.setLineDash([5,4]); ctx.globalAlpha=Math.min(1,upgFlash/12);
+    for(const t of towers) ringAt(t.c*CELL+CELL/2, t.r*CELL+CELL/2, eff(t).rng);
+    ctx.restore();
+  }
   for(const t of towers){ const x=t.c*CELL,y=t.r*CELL;
     if(!drawTowerAt(t.type==='gun'?'gun':'yagura', x+CELL/2, y+CELL+4)){ const b=TOWER[t.type];
       ctx.fillStyle=b.col; ctx.fillRect(x+12,y+16,CELL-24,CELL-22);
-      ctx.fillStyle=b.cap; ctx.fillRect(x+10,y+10,CELL-20,10); } }
+      ctx.fillStyle=b.cap; ctx.fillRect(x+10,y+10,CELL-20,10); }
+    // 撃った瞬間の火光（連射が上がるほど頻繁に光る）
+    if(t.flash>0){ t.flash--;
+      ctx.save(); ctx.globalAlpha=t.flash/5;
+      ctx.fillStyle='#fff2b0'; ctx.beginPath();
+      ctx.arc(x+CELL/2, y+CELL-26, 5, 0, 7); ctx.fill(); ctx.restore(); }
+    drawRank(x, y);
+  }
+  // 強化した瞬間、すべての櫓から輪が広がる
+  if(upgFlash>0){
+    const k=(40-upgFlash)/40;
+    ctx.save(); ctx.globalAlpha=(1-k)*0.8; ctx.strokeStyle='#ffd66b'; ctx.lineWidth=2;
+    for(const t of towers){ ctx.beginPath();
+      ctx.arc(t.c*CELL+CELL/2, t.r*CELL+CELL/2, 6+k*38, 0, 7); ctx.stroke(); }
+    ctx.restore();
+  }
   for(const e of enemies){ if(e.dead)continue;
     const ex=e.x+(e.ox||0), ey=e.y+(e.oy||0), im=ASSETS.ashigaru;
     if(rdy(im)){ const w=CELL*1.4*(e.sc||1), hh=w*im.naturalHeight/im.naturalWidth;
       ctx.save(); ctx.translate(ex,ey+18); if(e.faceLeft)ctx.scale(-1,1); ctx.drawImage(im,-w/2,-hh,w,hh); ctx.restore(); }
     else { ctx.fillStyle='#222'; ctx.beginPath();ctx.arc(ex,ey,9,0,7);ctx.fill(); }
     ctx.fillStyle='#d94'; ctx.fillRect(e.x-11,e.y-22,22*Math.max(0,e.hp/e.max),3); }
-  ctx.fillStyle='#ffe08a';
-  for(const p of projectiles){ ctx.beginPath(); ctx.arc(p.x,p.y,3,0,7); ctx.fill(); }
+  { const t=Math.min(1,upg.dmg/8), rad=3+t*3;
+    ctx.fillStyle='rgb('+Math.round(255)+','+Math.round(224+31*t)+','+Math.round(138+117*t)+')';
+    ctx.save(); ctx.shadowColor='#ffd66b'; ctx.shadowBlur=t*8;
+    for(const p of projectiles){ ctx.beginPath(); ctx.arc(p.x,p.y,rad,0,7); ctx.fill(); }
+    ctx.restore(); }
   if(ghost && phase==='shop'){
     const gx=ghost.c*CELL, gy=ghost.r*CELL;
     ctx.save(); ctx.globalAlpha=0.5;
@@ -631,8 +655,35 @@ function draw(){
     else { const tk=ghost.tool==='hori'?'shoji':'une'; if(rdy(ASSETS[tk])) ctx.drawImage(ASSETS[tk],gx,gy,CELL,CELL); else {ctx.fillStyle=ghost.tool==='hori'?'#3a6ea5':'#5a8ec0';ctx.fillRect(gx,gy,CELL,CELL);} }
     ctx.restore();
     ctx.strokeStyle='#ffd66b'; ctx.lineWidth=2; ctx.strokeRect(gx+2,gy+2,CELL-4,CELL-4); ctx.lineWidth=1;
+    // 置こうとしている櫓の射程を見せる（どこに置くと効くかが分かる）
+    if(ghost.tool==='yagura'||ghost.tool==='gun'){
+      ctx.save(); ctx.setLineDash([5,4]);
+      ringAt(gx+CELL/2, gy+CELL/2, RANGE*TOWER[ghost.tool].rmul*Math.pow(1.15,upg.rng));
+      ctx.restore(); }
   }
   ctx.restore();
+}
+function ringAt(cx,cy,r){
+  ctx.lineWidth=2.4; ctx.strokeStyle='rgba(20,12,4,.5)';
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,7); ctx.stroke();
+  ctx.lineWidth=1.4; ctx.strokeStyle='rgba(255,214,107,.9)';
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,7); ctx.stroke();
+  ctx.lineWidth=1;
+}
+// 櫓の足元に強化の段位を粒で表示（威力=金 / 連射=橙 / 射程=空色）
+function drawRank(x,y){
+  const rows=[['#ffd66b',upg.dmg],['#ff9d4d',upg.cd],['#8fd3ff',upg.rng]];
+  let line=0;
+  for(const [col,n] of rows){
+    if(!n) continue;
+    const show=Math.min(n,5), w=show*7-2, sx=x+CELL/2-w/2, sy=y+CELL-5-line*6;
+    ctx.fillStyle='rgba(20,12,4,.55)'; ctx.fillRect(sx-1, sy-1, w+2, 6);
+    ctx.fillStyle=col;
+    for(let i=0;i<show;i++) ctx.fillRect(sx+i*7, sy, 5, 4);
+    if(n>5){ ctx.font='bold 9px system-ui'; ctx.textAlign='left'; ctx.fillStyle=col;
+      ctx.fillText('+'+(n-5), sx+w+3, sy+4); }
+    line++;
+  }
 }
 function drawTowerAt(key,cx,cyB){ const im=ASSETS[key]; if(!rdy(im))return false; const H=CELL*1.9, w=H*im.naturalWidth/im.naturalHeight; ctx.drawImage(im,cx-w/2,cyB-H,w,H); return true; }
 function drawStruct(key,cx,cyB,wCells){ const im=ASSETS[key]; if(!rdy(im))return; const w=CELL*wCells, hh=w*im.naturalHeight/im.naturalWidth; ctx.drawImage(im,cx-w/2,cyB-hh,w,hh); }
@@ -642,6 +693,7 @@ function drawSprite(key,cx,cyB,scale){ const im=ASSETS[key]; if(!rdy(im))return 
 let msgTimer=0;
 function flash(t){ g('msg').textContent=t; msgTimer=t?150:0; }
 function loop(){ const n = phase==='battle' ? speed : 1;
+  if(upgFlash>0) upgFlash--;
   for(let i=0;i<n;i++) step();
   draw();
   if(msgTimer>0){ msgTimer--; if(msgTimer===0)g('msg').textContent=''; }
