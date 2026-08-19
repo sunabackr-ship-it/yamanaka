@@ -92,6 +92,15 @@
   #winReplayRow .wrlbl { flex:1 0 100%; text-align:center; font-size:11px; color:#cbb98a; opacity:.85; }
   .wrbtn { flex:1 1 0; min-width:0; padding:8px 4px; font-size:12px; font-weight:bold; background:#4a3f22; color:#ffe9ad; border:1px solid #6b5a34; border-radius:6px; cursor:pointer; white-space:nowrap; }
   .wrbtn:disabled { opacity:.38; cursor:default; font-weight:normal; }
+  #soundBtn { font-size:12px; padding:4px 8px 4px 10px; border:1px solid #6b5a34; border-radius:5px;
+    background:#4a3f22; color:#f2ead6; cursor:pointer; white-space:nowrap;
+    display:inline-flex; align-items:center; gap:7px; }
+  #soundBtn .sw, #soundBtn2 .sw { font-size:11px; font-weight:bold; letter-spacing:.06em; padding:1px 7px;
+    border-radius:9px; background:#2b2415; border:1px solid #6b5a34; }
+  #soundBtn.off { opacity:.62; }
+  #soundBtn2 { margin-top:10px; padding:6px 12px; font-size:12px; background:#4a3f22; color:#f2ead6;
+    border:1px solid #6b5a34; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:7px; }
+  #soundBtn2.off { opacity:.62; }
   #clearBest { margin-top:10px; padding:6px 10px; font-size:11px; background:transparent;
     color:#8f7f63; border:1px solid #4a3f22; border-radius:5px; cursor:pointer; }
   .ovbtn { margin-top:12px; padding:10px 22px; font-size:15px; font-weight:bold; background:#8a3b2e; color:#fff; border:none; border-radius:6px; cursor:pointer; }
@@ -181,6 +190,7 @@
     <div id="phase" class="hud-game">開戦前</div>
     <button id="learnBtn" class="hud-game">調べ学習モード<span class="sw">OFF</span></button>
     <button id="quitBtn" class="hud-game">やめる</button>
+    <button id="soundBtn" title="音の入り切り">🔊 音<span class="sw">ON</span></button>
     <button id="zukanBtn">📖 山中城のはなし</button>
   </div>
   <div class="bars">
@@ -258,6 +268,7 @@
       <button class="diffbtn" data-g="1.20">ノーマル<small>手強い。最終波が壁</small></button>
       <button class="diffbtn" data-g="1.23">ハード<small>精鋭ぞろい。仕掛けを使いこなせ</small></button>
       <div id="winReplayRow"><span class="wrlbl">勝どき（かちどき）をもう一度：</span><button class="wrbtn" data-t="0">イージー</button><button class="wrbtn" data-t="1">ノーマル</button><button class="wrbtn" data-t="2">ハード</button></div>
+      <button id="soundBtn2">🔊 音<span class="sw">ON</span></button>
       <button id="clearBest">記録を消す</button>
       <button id="openReplay" style="margin-top:4px;padding:8px;font-size:13px;background:transparent;color:#cbb98a;border:1px solid #6b5a34;border-radius:6px;cursor:pointer;">▶ オープニングをもう一度見る</button>
     </div>
@@ -344,6 +355,95 @@ const START=90, ALLIES_MAX=4000, LEAK_COST=400, KILL=2, LAST=20;  // 櫓の基�
 const TOTAL_SOLDIERS=67000, TOTAL_SPRITES=350, HALF=33500;  // 史実の寄せ手。1体≒191人（350体でちょうど67000に着地）
 const soldiersOf = k => Math.round(k*TOTAL_SOLDIERS/TOTAL_SPRITES);
 const RANGE=CELL*2.2, PSPD=7, HIT=8, SPAWN_INT=40;
+// ---------- 音（すべてWeb Audio APIで合成。音源ファイルを持たないので容量ゼロ・権利も自前）----------
+const SND_KEY='yamanaka_sound_v1';
+let sndOn = (function(){ try{ return localStorage.getItem(SND_KEY)!=='off'; }catch(e){ return true; } })();
+let actx=null, sndBus=null, noiseBuf=null;
+function audioInit(){
+  if(actx) return actx;
+  try{
+    const AC = window.AudioContext||window.webkitAudioContext;
+    if(!AC) return null;
+    actx = new AC();
+    sndBus = actx.createGain(); sndBus.gain.value=0.9; sndBus.connect(actx.destination);
+    // 打撃・破裂・弦に使うホワイトノイズ（1秒ぶんを使い回す）
+    noiseBuf = actx.createBuffer(1, actx.sampleRate, actx.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
+  }catch(e){ actx=null; }
+  return actx;
+}
+// iPad Safariは最初のタップまで音が出ない。最初の操作で解錠する
+function audioUnlock(){ const a=audioInit(); if(a&&a.state==='suspended') a.resume(); }
+['pointerdown','touchstart','keydown'].forEach(ev=>
+  document.addEventListener(ev, audioUnlock, {passive:true}));
+
+function env(node,t0,peak,attack,decay){
+  const g=actx.createGain(); g.gain.setValueAtTime(0.0001,t0);
+  g.gain.linearRampToValueAtTime(peak,t0+attack);
+  g.gain.exponentialRampToValueAtTime(0.0001,t0+attack+decay);
+  node.connect(g); g.connect(sndBus); return g;
+}
+function noise(t0,peak,decay,type,freq,q){
+  const s=actx.createBufferSource(); s.buffer=noiseBuf; s.loop=true;
+  const f=actx.createBiquadFilter(); f.type=type; f.frequency.setValueAtTime(freq,t0);
+  if(q) f.Q.setValueAtTime(q,t0);
+  s.connect(f); env(f,t0,peak,0.002,decay);
+  s.start(t0); s.stop(t0+decay+0.05); return f;
+}
+function tone(t0,peak,decay,type,f1,f2,attack){
+  const o=actx.createOscillator(); o.type=type;
+  o.frequency.setValueAtTime(f1,t0);
+  if(f2&&f2!==f1) o.frequency.exponentialRampToValueAtTime(Math.max(20,f2),t0+decay);
+  env(o,t0,peak,attack||0.004,decay);
+  o.start(t0); o.stop(t0+decay+0.05); return o;
+}
+// 同じ音が重なりすぎないよう最短間隔をあける（発射・撃破は毎フレーム起こりうる）
+const sndLast={}, SND_GAP={bow:45, gun:60, kill:35};
+function playSE(name){
+  if(!sndOn) return;
+  const a=audioInit(); if(!a||a.state==='suspended') return;
+  const now=a.currentTime, ms=performance.now(), gap=SND_GAP[name];
+  if(gap){ if(sndLast[name] && ms-sndLast[name]<gap) return; sndLast[name]=ms; }
+  const t=now+0.001;
+  switch(name){
+    case 'bow':                                   // 弓：弦がヒュッと弾ける
+      noise(t,0.30,0.06,'bandpass',2100,2.5);
+      tone(t,0.05,0.05,'triangle',900,420); break;
+    case 'gun':                                   // 鉄砲：低く短い破裂
+      noise(t,0.22,0.11,'lowpass',900);
+      tone(t,0.20,0.10,'sine',110,42); break;
+    case 'kill':                                  // 退けた：控えめなトスッ
+      noise(t,0.16,0.05,'lowpass',900); break;
+    case 'build':                                 // 建てる：木槌のトン
+      tone(t,0.16,0.13,'triangle',210,150);
+      noise(t,0.07,0.03,'bandpass',1300,4); break;
+    case 'leak':                                  // 本丸を突かれた：沈む低音
+      tone(t,0.30,0.50,'sine',150,55,0.01);
+      noise(t,0.10,0.22,'lowpass',420); break;
+    case 'wave':                                  // 波が来る：太鼓の一打
+      tone(t,0.32,0.34,'sine',104,58,0.006);
+      noise(t,0.14,0.10,'lowpass',1100);
+      tone(t+0.20,0.20,0.28,'sine',98,55,0.006); break;
+    case 'clear': {                               // 凌いだ：和風五音階で上がる
+      const sc=[392,440,523.25];                  // ソ・ラ・ド
+      sc.forEach((f,i)=> tone(t+i*0.085,0.14,0.30,'triangle',f,f,0.006));
+      break; }
+  }
+}
+function updateSoundBtns(){
+  ['soundBtn','soundBtn2'].forEach(id=>{
+    const b=g(id); if(!b) return;
+    b.innerHTML=(sndOn?'🔊':'🔇')+' 音<span class="sw">'+(sndOn?'ON':'OFF')+'</span>';
+    b.classList.toggle('off',!sndOn);
+  });
+}
+function toggleSound(){
+  sndOn=!sndOn;
+  try{ localStorage.setItem(SND_KEY, sndOn?'on':'off'); }catch(e){}
+  updateSoundBtns();
+  if(sndOn){ audioUnlock(); playSE('build'); }     // 入れた時は手応えを返す
+}
 // 弾は種別を持つ：弓＝白い矢が山なりに飛ぶ／鉄砲＝黒い粒がまっすぐ飛ぶ
 // sx,sy,d0 は見た目（弧と発砲煙）専用。当たり判定は従来どおり x,y の直線追尾なのでバランスは変わらない
 function mkShot(x,y,tgt,dmg,kind){
@@ -485,6 +585,7 @@ function commitPlace(c,r,tl){
     gold-=S.cost; hori[key]={f:S.f,cost:S.cost}; unlockZukan(tl==='hori'?'障子堀':'畝堀');
     lastAction={type:'hori',c,r,cost:S.cost};
   }
+  playSE('build');
 }
 function place(px,py){
   if(phase!=='shop') return;
@@ -557,17 +658,17 @@ g('upRng').onclick=()=>{ if(phase!=='shop')return; if(upg.rng>=RNG_CAP){flash('�
 g('stDemaru').onclick=()=>{ if(phase!=='shop'||struct.demaru)return;
   if(gold<COST_DEMARU){flash('石高が足りない');return;}
   if(DETOUR_CELLS.filter(d=>[[0,2],[1,2]].some(x=>x[0]===d[0]&&x[1]===d[1])).some(d=>towers.some(t=>t.c===d[0]&&t.r===d[1]))){flash('予定地の櫓を撤去して');return;}
-  gold-=COST_DEMARU; struct.demaru=true; rebuildPath(); unlockZukan('岱崎出丸'); refresh(); };
+  gold-=COST_DEMARU; struct.demaru=true; rebuildPath(); unlockZukan('岱崎出丸'); playSE('build'); refresh(); };
 g('stUmadashi').onclick=()=>{ if(phase!=='shop'||struct.umadashi)return;
   if(gold<COST_UMADASHI){flash('石高が足りない');return;}
-  gold-=COST_UMADASHI; struct.umadashi=true; rebuildPath(); unlockZukan('丸馬出'); refresh(); };
+  gold-=COST_UMADASHI; struct.umadashi=true; rebuildPath(); unlockZukan('丸馬出'); playSE('build'); refresh(); };
 g('stTatebori').onclick=()=>{ if(phase!=='shop'||struct.tatebori)return;
   if(gold<COST_TATEBORI){flash('石高が足りない');return;}
-  gold-=COST_TATEBORI; struct.tatebori=true; rebuildPath(); unlockZukan('竪堀'); refresh(); };
+  gold-=COST_TATEBORI; struct.tatebori=true; rebuildPath(); unlockZukan('竪堀'); playSE('build'); refresh(); };
 g('stBridge').onclick=()=>{ if(phase!=='shop')return; if(bridgeArmed){flash('落とし橋は準備済み');return;}
   const c = bridgeBuilt ? COST_BRIDGE_FIX : COST_BRIDGE;
   if(gold<c){flash('石高が足りない');return;}
-  gold-=c; bridgeArmed=true; bridgeBuilt=true; unlockZukan('落とし橋');
+  gold-=c; bridgeArmed=true; bridgeBuilt=true; unlockZukan('落とし橋'); playSE('build');
   flash(bridgeBuilt&&c===COST_BRIDGE_FIX?'落とし橋を架け直した':'橋に仕掛けを施した'); refresh(); };
 
 // 早送り / 落とし橋
@@ -610,6 +711,7 @@ g('start').onclick=()=>{
   enemies=[]; projectiles=[]; spawnLeft=waveN(wave); spawnTimer=0; bridgeDown=false; bridgeFalls=0; bridgeFell=0;
   for(const t of towers) t.cd=0; deCd=0;
   g('drop').classList.toggle('dis', !bridgeArmed);
+  playSE('wave');
   flash('第'+wave+'波 ― 来るぞ'); refresh();
 };
 
@@ -638,21 +740,21 @@ function step(){
       refresh();   // 「あと何兵落とせるか」のボタン表示を追従させる
       continue; }
     e.t=nt; const p=ptAt(e.t); if(p[0]<e.x-0.3)e.faceLeft=true; else if(p[0]>e.x+0.3)e.faceLeft=false; e.x=p[0]; e.y=p[1];
-    if(e.t>=PATH.length-1){ e.dead=true; leaked++; checkHalf(); allies-=LEAK_COST; flash('本丸を突かれた！ 味方-'+LEAK_COST);
+    if(e.t>=PATH.length-1){ e.dead=true; leaked++; checkHalf(); allies-=LEAK_COST; playSE('leak'); flash('本丸を突かれた！ 味方-'+LEAK_COST);
       if(allies<=0){ allies=0; enemies=enemies.filter(x=>!x.dead); return over(false); } }
   }
   enemies=enemies.filter(e=>!e.dead);
   for(const t of towers){ t.cd--; if(t.cd>0)continue; const E=eff(t);
     const tx=t.c*CELL+CELL/2, ty=t.r*CELL+CELL/2; let tgt=null,bd=1e9;
     for(const e of enemies){ const d=Math.hypot(e.x-tx,e.y-ty); if(d<E.rng&&d<bd){bd=d;tgt=e;} }
-    if(tgt){ projectiles.push(mkShot(tx,ty,tgt,E.dmg,t.type)); t.cd=E.rcd; t.flash=5; } }
+    if(tgt){ projectiles.push(mkShot(tx,ty,tgt,E.dmg,t.type)); playSE(t.type==='gun'?'gun':'bow'); t.cd=E.rcd; t.flash=5; } }
   if(struct.demaru){ deCd--; if(deCd<=0){ const tx=1*CELL+CELL/2, ty=3*CELL+CELL/2; let tgt=null,bd=1e9;
     for(const e of enemies){ const d=Math.hypot(e.x-tx,e.y-ty); if(d<RANGE*1.15&&d<bd){bd=d;tgt=e;} }
-    if(tgt){ projectiles.push(mkShot(tx,ty,tgt,2,'yagura')); deCd=30; } } }
+    if(tgt){ projectiles.push(mkShot(tx,ty,tgt,2,'yagura')); playSE('bow'); deCd=30; } } }
   for(const p of projectiles){ if(p.tgt.dead){p.hit=true;continue;}
     const dx=p.tgt.x-p.x,dy=p.tgt.y-p.y,d=Math.hypot(dx,dy);
     if(d<HIT){ p.hit=true; p.tgt.hp-=p.dmg; if(p.tgt.hp<=0){ p.tgt.dead=true; gold+=KILL;
-      bumpKill(); } }
+      playSE('kill'); bumpKill(); } }
     else{ p.x+=dx/d*PSPD; p.y+=dy/d*PSPD; p.age++; } }
   projectiles=projectiles.filter(p=>!p.hit);
   enemies=enemies.filter(e=>!e.dead);
@@ -661,6 +763,7 @@ function step(){
     if(wave>=LAST) return over(true);  // 全波突破＝勝利
     wave++; phase='shop';
     g('battlePanel').style.display='none'; g('shopPanel').style.display='block';
+    playSE('clear');
     flash('第'+(wave-1)+'波 突破！ +'+clearBonus(wave-1)+'石  次の備えへ');
     refresh();
   }
@@ -1084,6 +1187,7 @@ document.querySelectorAll('.diffbtn').forEach(btn=>{
   btn.innerHTML = (src?'<span class="di"><img src="'+src+'" alt=""></span>':'')
                 + '<span class="dt">'+btn.innerHTML+'</span>';
 });
+g('soundBtn').onclick=toggleSound; g('soundBtn2').onclick=toggleSound; updateSoundBtns();
 updateBestOnButtons();
 if(!bestOK) g('clearBest').style.display='none';   // 保存できない環境では記録UIを出さない
 document.body.classList.add('pregame');
