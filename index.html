@@ -1216,8 +1216,8 @@ function loop(){ const n = phase==='battle' ? speed : 1;
   draw();
   if(msgTimer>0){ msgTimer--; if(msgTimer===0)g('msg').textContent=''; }
   requestAnimationFrame(loop); }
-const OPCUTS=['op1','op2','op3','op4','op5'];
-const TELOP=['1590年 ――\n豊臣の大軍、西より迫る','箱根の山の手前、\n最前線の城 ―― 山中城','守るは、わずか四千','対するは、六万七千\n―― ここを抜かれれば、\n小田原が落ちる','―― 攻防、始まる'];
+const OPCUTS=['op1','op2','op5','op3','op4'];   // 攻め手→守り手の順、かつ時間順（遠景→城→行軍→対峙→突撃）。画像キーの番号順ではない
+const TELOP=['1590年 ――\n豊臣の大軍、西より迫る','箱根の山の手前、\n最前線の城 ―― 山中城','攻め寄せるは、六万七千','受けて立つは、わずか四千\n―― ここを抜かれれば、\n小田原が落ちる','―― 攻防、始まる'];
 const CUT_MS=3800;
 let openIdx=0, openTimer=null;
 function renderCut(){ const bg=g('openBg'), el=g('openTelop');
