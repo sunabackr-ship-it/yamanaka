@@ -125,6 +125,19 @@
   #introOv.enter.reveal::before { opacity:0; transition:opacity .8s ease; }
   #introOv.enter > * { position:relative; z-index:1; }
   #introOv.enter > :not(#titleLogo) { opacity:0; pointer-events:none; transition:none; }
+  /* 導入の図を順に見せる。子は自前の opacity を持つのでグループ側だけ動かす */
+  #introOv .an { opacity:0; }
+  #introOv .an.go { animation: figIn .45s ease forwards; }
+  @keyframes figIn { to { opacity:1 } }
+  #introOv .s1.go{animation-delay:.05s} #introOv .s2.go{animation-delay:.40s}
+  #introOv .s3.go{animation-delay:.75s} #introOv .s4.go{animation-delay:1.40s}
+  #introOv .s5.go{animation-delay:1.70s} #introOv .s6.go{animation-delay:2.20s}
+  #introOv .s7.go{animation-delay:2.60s} #introOv .s8.go{animation-delay:2.90s}
+  #introOv .s9.go{animation-delay:5.40s}
+  #introOv .drawline { stroke-dasharray:1; stroke-dashoffset:1; }
+  #introOv .s3.go .drawline { animation: drawIn .8s ease-out forwards; animation-delay:.75s; }
+  @keyframes drawIn { to { stroke-dashoffset:0 } }
+  #introOv .mkT, #introOv .mkH { opacity:0; }
   #introOv.enter.reveal > :not(#titleLogo) { opacity:var(--rvop,1); transition:opacity .6s ease; }
   /* revealの戻り先は各要素の本来の透明度に合わせる（終了時にポンと変わるのを防ぐ） */
   #introOv h2 { --rvop:.9; }
@@ -239,43 +252,52 @@
       </div>
       <h2>1590年 ― 最前線の城</h2>
       <p>豊臣の大軍が西・<b>三島</b>から迫る。小田原へ入るには<b>箱根峠(846m)</b>を越えるしかない。その手前、標高<b>580m</b>の最前線が<b>山中城</b>。ここを抜かれれば小田原が落ちる。</p>
-      <svg viewBox="0 0 460 176" style="width:100%;max-width:440px;margin:6px 0" role="img" aria-label="三島から箱根峠までの断面図。標高580mの山中城が峠の手前にある。">
+      <svg id="svgTerrain" viewBox="0 0 460 176" style="width:100%;max-width:440px;margin:6px 0" role="img" aria-label="三島から箱根峠までの断面図。標高580mの山中城が峠の手前にある。">
         <rect x="0" y="0" width="460" height="176" rx="8" fill="rgba(14,10,5,.55)"/>
-        <!-- 地形 -->
-        <polygon points="10,138 70,133 120,124 165,104 200,76 250,36 292,72 340,110 395,128 450,134 450,158 10,158" fill="#463b20" opacity=".85"/>
-        <polyline points="10,138 70,133 120,124 165,104 200,76 250,36 292,72 340,110 395,128 450,134" fill="none" stroke="#8a7a4a" stroke-width="2.5"/>
-        <!-- 東海道：稜線の上をたどり、山中城を通り抜ける -->
-        <polyline points="10,134 70,129 120,120 165,100 200,72 250,32 292,68 340,106 395,124 450,130"
-                  fill="none" stroke="#ffe9ad" stroke-width="1.6" stroke-dasharray="5 4" opacity=".85"/>
-        <text x="330" y="96" fill="#ffe9ad" font-size="10.5" opacity=".9" transform="rotate(21 330 96)">東海道</text>
-        <!-- 豊臣軍の進路 -->
-        <path d="M22,126 Q100,124 168,96" fill="none" stroke="#e0714a" stroke-width="2.4"/>
-        <polygon points="180,90 163,92 169,103" fill="#e0714a"/>
-        <text x="18" y="118" fill="#e0714a" font-size="12.5" font-weight="bold">豊臣軍</text>
-        <!-- 山中城 -->
-        <line x1="200" y1="76" x2="200" y2="50" stroke="#ffd66b" stroke-width="1.6"/>
-        <polygon points="200,50 219,55 200,61" fill="#ffd66b"/>
-        <circle cx="200" cy="76" r="4.5" fill="#ffd66b" stroke="#5a4a1a" stroke-width="1"/>
-        <text x="96" y="48" fill="#ffd66b" font-size="12" font-weight="bold">山中城 580m</text>
-        <text x="96" y="61" fill="#ffd66b" font-size="10" opacity=".85">ここで食い止める</text>
-        <!-- 箱根峠 -->
-        <text x="256" y="30" fill="#f2ead6" font-size="11">箱根峠 846m</text>
-        <!-- 両端 -->
-        <text x="12" y="152" fill="#cfe4f7" font-size="11">三島側</text>
-        <text x="448" y="152" text-anchor="end" fill="#f2ead6" font-size="11">小田原城</text>
-        <text x="448" y="166" text-anchor="end" fill="#f2ead6" font-size="9.5" opacity=".75">抜かれたら、ここが落ちる</text>
+        <g class="an s1"><!-- 山と両端 -->
+          <polygon points="10,138 70,133 120,124 165,104 200,76 250,36 292,72 340,110 395,128 450,134 450,158 10,158" fill="#463b20" opacity=".85"/>
+          <polyline points="10,138 70,133 120,124 165,104 200,76 250,36 292,72 340,110 395,128 450,134" fill="none" stroke="#8a7a4a" stroke-width="2.5"/>
+          <text x="12" y="152" fill="#cfe4f7" font-size="11">三島側</text>
+          <text x="256" y="30" fill="#f2ead6" font-size="11">箱根峠 846m</text>
+        </g>
+        <g class="an s2"><!-- 東海道 -->
+          <polyline points="10,134 70,129 120,120 165,100 200,72 250,32 292,68 340,106 395,124 450,130"
+                    fill="none" stroke="#ffe9ad" stroke-width="1.6" stroke-dasharray="5 4" opacity=".85"/>
+          <text x="330" y="96" fill="#ffe9ad" font-size="10.5" opacity=".9" transform="rotate(21 330 96)">東海道</text>
+        </g>
+        <g class="an s3"><!-- 豊臣軍：線が伸びる -->
+          <path class="drawline" d="M22,126 Q100,124 168,96" pathLength="1" fill="none" stroke="#e0714a" stroke-width="2.4"/>
+          <text x="18" y="118" fill="#e0714a" font-size="12.5" font-weight="bold">豊臣軍</text>
+        </g>
+        <g class="an s4"><polygon points="180,90 163,92 169,103" fill="#e0714a"/></g>
+        <g class="an s5"><!-- 山中城 -->
+          <line x1="200" y1="76" x2="200" y2="50" stroke="#ffd66b" stroke-width="1.6"/>
+          <polygon points="200,50 219,55 200,61" fill="#ffd66b"/>
+          <circle cx="200" cy="76" r="4.5" fill="#ffd66b" stroke="#5a4a1a" stroke-width="1"/>
+          <text x="96" y="48" fill="#ffd66b" font-size="12" font-weight="bold">山中城 580m</text>
+          <text x="96" y="61" fill="#ffd66b" font-size="10" opacity=".85">ここで食い止める</text>
+        </g>
+        <g class="an s6"><!-- 小田原城 -->
+          <image id="odawaraIcon" x="402" y="100" width="36" height="36" preserveAspectRatio="xMidYMax meet"/>
+          <text x="448" y="152" text-anchor="end" fill="#f2ead6" font-size="11">小田原城</text>
+        </g>
+        <g class="an s7"><text x="448" y="166" text-anchor="end" fill="#f2ead6" font-size="9.5" opacity=".75">抜かれたら、ここが落ちる</text></g>
       </svg>
       <p class="big">味方4000 ― 攻め手6万7千を受けとめろ</p>
-      <svg viewBox="0 0 460 126" style="width:100%;max-width:440px;margin:8px 0" role="img" aria-label="兵力差の比較。豊臣軍6万7千に対し、山中城の守りは4千。およそ17倍。">
+      <svg id="svgForce" viewBox="0 0 460 126" style="width:100%;max-width:440px;margin:8px 0" role="img" aria-label="兵力差の比較。豊臣軍6万7千に対し、山中城の守りは4千。およそ17倍。">
         <rect x="0" y="0" width="460" height="126" rx="8" fill="rgba(14,10,5,.55)"/>
-        <text x="12" y="19" fill="#e0714a" font-size="12.5" font-weight="bold">攻める豊臣軍</text>
-        <text x="448" y="19" text-anchor="end" fill="#e0714a" font-size="13" font-weight="bold">6万7千</text>
-        <rect x="12" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="18" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="24" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="30" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="36" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="42" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="48" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="54" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="60" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="66" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="72" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="78" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="84" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="90" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="96" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="102" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="108" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="114" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="120" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="126" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="132" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="138" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="144" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="150" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="156" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="162" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="168" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="174" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="180" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="186" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="192" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="198" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="204" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="210" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="216" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="222" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="228" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="234" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="240" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="246" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="252" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="258" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="264" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="270" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="276" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="282" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="288" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="294" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="300" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="306" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="312" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="318" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="324" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="330" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="336" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="342" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="348" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="354" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="360" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="366" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="372" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="378" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="384" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="390" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="396" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="402" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect x="408" y="26" width="5" height="13" rx="1" fill="#e0714a"/>
-        <text x="12" y="66" fill="#ffd66b" font-size="12.5" font-weight="bold">守る北条方（山中城）</text>
-        <text x="448" y="66" text-anchor="end" fill="#ffd66b" font-size="13" font-weight="bold">4千</text>
-        <rect x="12" y="73" width="5" height="13" rx="1" fill="#ffd66b"/><rect x="18" y="73" width="5" height="13" rx="1" fill="#ffd66b"/><rect x="24" y="73" width="5" height="13" rx="1" fill="#ffd66b"/><rect x="30" y="73" width="5" height="13" rx="1" fill="#ffd66b"/>
-        <line x1="12" y1="98" x2="448" y2="98" stroke="#6b5a34" stroke-width="1"/>
-        <text x="448" y="115" text-anchor="end" fill="#f2ead6" font-size="11.5" font-weight="bold">兵力差 およそ17倍</text>
+        <g class="an s8">
+          <text x="12" y="19" fill="#e0714a" font-size="12.5" font-weight="bold">攻める豊臣軍</text>
+          <text id="cntToyo" x="448" y="19" text-anchor="end" fill="#e0714a" font-size="13" font-weight="bold">6万7千</text>
+          <text x="12" y="66" fill="#ffd66b" font-size="12.5" font-weight="bold">守る北条方（山中城）</text>
+          <text id="cntHojo" x="448" y="66" text-anchor="end" fill="#ffd66b" font-size="13" font-weight="bold">4千</text>
+        </g>
+        <rect class="mkT" x="12" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="18" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="24" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="30" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="36" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="42" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="48" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="54" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="60" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="66" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="72" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="78" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="84" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="90" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="96" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="102" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="108" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="114" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="120" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="126" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="132" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="138" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="144" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="150" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="156" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="162" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="168" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="174" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="180" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="186" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="192" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="198" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="204" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="210" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="216" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="222" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="228" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="234" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="240" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="246" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="252" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="258" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="264" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="270" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="276" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="282" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="288" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="294" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="300" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="306" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="312" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="318" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="324" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="330" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="336" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="342" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="348" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="354" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="360" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="366" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="372" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="378" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="384" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="390" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="396" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="402" y="26" width="5" height="13" rx="1" fill="#e0714a"/><rect class="mkT" x="408" y="26" width="5" height="13" rx="1" fill="#e0714a"/>
+        <rect class="mkH" x="12" y="73" width="5" height="13" rx="1" fill="#ffd66b"/><rect class="mkH" x="18" y="73" width="5" height="13" rx="1" fill="#ffd66b"/><rect class="mkH" x="24" y="73" width="5" height="13" rx="1" fill="#ffd66b"/><rect class="mkH" x="30" y="73" width="5" height="13" rx="1" fill="#ffd66b"/>
+        <g class="an s9">
+          <line x1="12" y1="98" x2="448" y2="98" stroke="#6b5a34" stroke-width="1"/>
+          <text x="448" y="115" text-anchor="end" fill="#f2ead6" font-size="11.5" font-weight="bold">兵力差 およそ17倍</text>
+        </g>
       </svg>
       <button id="introZukan" style="width:100%;max-width:440px;margin:10px 0 2px;padding:11px;font-size:14px;font-weight:bold;background:#7a6320;color:#ffe9ad;border:1px solid #ffd66b;border-radius:6px;cursor:pointer;">📖 先に「山中城のはなし」を読む</button>
       <button id="resumeBtn">▶ 続きから</button>
@@ -1003,6 +1025,7 @@ function toTitle(){
   phase='intro'; g('introOv').classList.add('on');
   loadSave(); updateBestOnButtons(); refresh();
   const ov=g('introOv'); if(ov) ov.scrollTop=0;
+  playFigAnim();
 }
 g('quitBtn').onclick=()=>{
   if(phase!=='shop' && phase!=='battle'){ toTitle(); return; }
@@ -1228,7 +1251,7 @@ function renderCut(){ const bg=g('openBg'), el=g('openTelop');
     bg.style.opacity='1'; el.textContent=TELOP[openIdx]; el.style.opacity='1'; }, 500);
   openTimer=setTimeout(()=>{ openIdx++; if(openIdx>=OPCUTS.length) endOpening(); else renderCut(); }, CUT_MS); }
 function startOpening(){ openIdx=0; renderCut(); }
-function playOpening(){ g('introOv').classList.remove('on'); g('openOv').classList.add('on'); phase='opening'; startOpening(); }
+function playOpening(){ stopFigAnim(); g('introOv').classList.remove('on'); g('openOv').classList.add('on'); phase='opening'; startOpening(); }
 g('openReplay').onclick=playOpening;
 g('clearBest').onclick=()=>{
   if(!confirm('この端末に保存された自己ベストと、途中まで進めている戦いを消します。よろしいですか？')) return;
@@ -1237,11 +1260,46 @@ g('clearBest').onclick=()=>{
 function endOpening(){ if(openTimer)clearTimeout(openTimer); g('openOv').classList.remove('on'); g('introOv').classList.add('on'); phase='intro'; updateBestOnButtons(); introEntrance(); }
 // オープニング明け：ロゴが画面中央にふわっと現れ、定位置へ上がってから残りの画面が出る
 let entTimers=[];
+// 導入の図の演出。目盛りを1本ずつ出し、数字も一緒に上がる。
+// 北条は4本ですぐ止まり、豊臣は67本続く ― その「長さの差」で兵力差を体感させる
+let figTimer=null, figDelay=null;
+const jpNum = n => { const man=Math.floor(n/10000), sen=(n%10000)/1000;
+  return man&&sen ? man+'万'+sen+'千' : man ? man+'万' : sen ? sen+'千' : '0'; };
+function stopFigAnim(){ if(figTimer){clearInterval(figTimer);figTimer=null;} if(figDelay){clearTimeout(figDelay);figDelay=null;} }
+function showFigStatic(){          // 動きを控える設定のときは完成形をそのまま出す
+  const ov=g('introOv'); if(!ov) return;
+  ov.querySelectorAll('.an').forEach(el=>{ el.classList.remove('go'); el.style.opacity='1'; });
+  ov.querySelectorAll('.mkT,.mkH').forEach(r=>r.style.opacity='1');
+  const ct=g('cntToyo'), ch=g('cntHojo');
+  if(ct) ct.textContent=jpNum(TOTAL_SOLDIERS>=67000?67000:TOTAL_SOLDIERS); if(ch) ch.textContent='4千';
+}
+function playFigAnim(){
+  const ov=g('introOv'); if(!ov) return;
+  stopFigAnim();
+  if(IMG_DATA.ico_keep){ const ic=g('odawaraIcon'); if(ic) ic.setAttribute('href', IMG_DATA.ico_keep); }
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches){ showFigStatic(); return; }
+  ov.querySelectorAll('.an').forEach(el=>{ el.style.opacity=''; el.classList.remove('go'); });
+  void ov.offsetWidth;                       // ここで再描画を挟まないと2回目以降に再生されない
+  ov.querySelectorAll('.an').forEach(el=>el.classList.add('go'));
+  const T=[...ov.querySelectorAll('.mkT')], H=[...ov.querySelectorAll('.mkH')];
+  T.concat(H).forEach(r=>r.style.opacity='0');
+  const ct=g('cntToyo'), ch=g('cntHojo');
+  if(ct) ct.textContent='0'; if(ch) ch.textContent='0';
+  let i=0;
+  figDelay=setTimeout(()=>{
+    figTimer=setInterval(()=>{
+      if(i<T.length){ T[i].style.opacity='1'; if(ct) ct.textContent=jpNum((i+1)*1000); }
+      if(i<H.length){ H[i].style.opacity='1'; if(ch) ch.textContent=jpNum((i+1)*1000); }
+      i++;
+      if(i>=T.length){ clearInterval(figTimer); figTimer=null; }
+    }, 30);
+  }, 3200);
+}
 function introEntrance(){
   const ov=g('introOv'), lg=g('titleLogo');
   entTimers.forEach(clearTimeout); entTimers=[];
   ov.scrollTop=0;
-  if(matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches){ showFigStatic(); return; }
   ov.classList.add('enter');
   const r=lg.getBoundingClientRect();
   const dy=Math.max(0,(window.innerHeight/2)-(r.top+r.height/2));
@@ -1252,7 +1310,7 @@ function introEntrance(){
   lg.style.transition='opacity 1s ease, transform .75s ease-in-out';
   lg.style.opacity='1';
   entTimers.push(setTimeout(()=>{ lg.style.transform='translateY(0) scale(1)'; },1350));
-  entTimers.push(setTimeout(()=>{ ov.classList.add('reveal'); },1950));
+  entTimers.push(setTimeout(()=>{ ov.classList.add('reveal'); playFigAnim(); },1950));
   entTimers.push(setTimeout(finishEntrance,2700));
   ov.addEventListener('click',finishEntrance,{once:true});
 }
