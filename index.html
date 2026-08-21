@@ -267,13 +267,17 @@
         </g>
         <g class="an s3"><!-- 豊臣軍：線が伸びる -->
           <path class="drawline" d="M22,126 Q100,124 168,96" pathLength="1" fill="none" stroke="#e0714a" stroke-width="2.4"/>
-          <text x="18" y="118" fill="#e0714a" font-size="12.5" font-weight="bold">豊臣軍</text>
+          <image id="toyotomiIcon" x="14" y="104" width="30" height="30" preserveAspectRatio="xMidYMax meet" style="display:none"/>
+          <text id="toyotomiLabel" x="18" y="118" fill="#e0714a" font-size="12.5" font-weight="bold">豊臣軍</text>
         </g>
         <g class="an s4"><polygon points="180,90 163,92 169,103" fill="#e0714a"/></g>
         <g class="an s5"><!-- 山中城 -->
-          <line x1="200" y1="76" x2="200" y2="50" stroke="#ffd66b" stroke-width="1.6"/>
-          <polygon points="200,50 219,55 200,61" fill="#ffd66b"/>
-          <circle cx="200" cy="76" r="4.5" fill="#ffd66b" stroke="#5a4a1a" stroke-width="1"/>
+          <g id="yamanakaMark">
+            <line x1="200" y1="76" x2="200" y2="50" stroke="#ffd66b" stroke-width="1.6"/>
+            <polygon points="200,50 219,55 200,61" fill="#ffd66b"/>
+            <circle cx="200" cy="76" r="4.5" fill="#ffd66b" stroke="#5a4a1a" stroke-width="1"/>
+          </g>
+          <image id="yamanakaIcon" x="176" y="44" width="34" height="34" preserveAspectRatio="xMidYMax meet" style="display:none"/>
           <text x="96" y="48" fill="#ffd66b" font-size="12" font-weight="bold">山中城 580m</text>
           <text x="96" y="61" fill="#ffd66b" font-size="10" opacity=".85">ここで食い止める</text>
         </g>
@@ -1265,9 +1269,27 @@ let entTimers=[];
 let figTimer=null, figDelay=null;
 const jpNum = n => { const man=Math.floor(n/10000), sen=(n%10000)/1000;
   return man&&sen ? man+'万'+sen+'千' : man ? man+'万' : sen ? sen+'千' : '0'; };
+// 断面図のアイコン。専用のものが入っていればそれを使い、無ければ従来の記号に戻す
+function applyMapIcons(){
+  const od=g('odawaraIcon'), ym=g('yamanakaIcon'), ymk=g('yamanakaMark'), ty=g('toyotomiIcon'), tl=g('toyotomiLabel');
+  // 小田原城：専用アイコン → 無ければ本丸アイコンで代用
+  const odSrc = IMG_DATA.ico_odawara || IMG_DATA.ico_keep;
+  if(od && odSrc) od.setAttribute('href', odSrc);
+  // 山中城：専用アイコンがあれば旗＋点と差し替える
+  if(ym && IMG_DATA.ico_yamanaka){
+    ym.setAttribute('href', IMG_DATA.ico_yamanaka); ym.style.display='';
+    if(ymk) ymk.style.display='none';
+  } else if(ymk){ ymk.style.display=''; if(ym) ym.style.display='none'; }
+  // 豊臣軍：あれば矢印の根元に置き、文字は右へ寄せる
+  if(ty && IMG_DATA.ico_toyotomi){
+    ty.setAttribute('href', IMG_DATA.ico_toyotomi); ty.style.display='';
+    if(tl){ tl.setAttribute('x','48'); tl.setAttribute('y','124'); }
+  } else if(ty){ ty.style.display='none'; if(tl){ tl.setAttribute('x','18'); tl.setAttribute('y','118'); } }
+}
 function stopFigAnim(){ if(figTimer){clearInterval(figTimer);figTimer=null;} if(figDelay){clearTimeout(figDelay);figDelay=null;} }
 function showFigStatic(){          // 動きを控える設定のときは完成形をそのまま出す
   const ov=g('introOv'); if(!ov) return;
+  applyMapIcons();
   ov.querySelectorAll('.an').forEach(el=>{ el.classList.remove('go'); el.style.opacity='1'; });
   ov.querySelectorAll('.mkT,.mkH').forEach(r=>r.style.opacity='1');
   const ct=g('cntToyo'), ch=g('cntHojo');
@@ -1276,7 +1298,7 @@ function showFigStatic(){          // 動きを控える設定のときは完成
 function playFigAnim(){
   const ov=g('introOv'); if(!ov) return;
   stopFigAnim();
-  if(IMG_DATA.ico_keep){ const ic=g('odawaraIcon'); if(ic) ic.setAttribute('href', IMG_DATA.ico_keep); }
+  applyMapIcons();
   if(matchMedia('(prefers-reduced-motion: reduce)').matches){ showFigStatic(); return; }
   ov.querySelectorAll('.an').forEach(el=>{ el.style.opacity=''; el.classList.remove('go'); });
   void ov.offsetWidth;                       // ここで再描画を挟まないと2回目以降に再生されない
