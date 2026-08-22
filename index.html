@@ -411,7 +411,7 @@ const RANGE=CELL*2.2, PSPD=7, HIT=8, SPAWN_INT=40;
 // ---------- 音（すべてWeb Audio APIで合成。音源ファイルを持たないので容量ゼロ・権利も自前）----------
 const SND_KEY='yamanaka_sound_v1';
 let sndOn = (function(){ try{ return localStorage.getItem(SND_KEY)!=='off'; }catch(e){ return true; } })();
-let actx=null, sndBus=null, noiseBuf=null;
+let actx=null, sndBus=null, noiseBuf=null, bgmBus=null;
 function audioInit(){
   if(actx) return actx;
   try{
@@ -419,6 +419,8 @@ function audioInit(){
     if(!AC) return null;
     actx = new AC();
     sndBus = actx.createGain(); sndBus.gain.value=0.9; sndBus.connect(actx.destination);
+    // BGMは効果音とは別系統。効果音が埋もれないよう小さめに保つ
+    bgmBus = actx.createGain(); bgmBus.gain.value=0.0; bgmBus.connect(actx.destination);
     // 打撃・破裂・弦に使うホワイトノイズ（1秒ぶんを使い回す）
     noiseBuf = actx.createBuffer(1, actx.sampleRate, actx.sampleRate);
     const d = noiseBuf.getChannelData(0);
@@ -427,7 +429,7 @@ function audioInit(){
   return actx;
 }
 // iPad Safariは最初のタップまで音が出ない。最初の操作で解錠する
-function audioUnlock(){ const a=audioInit(); if(a&&a.state==='suspended') a.resume(); }
+function audioUnlock(){ const a=audioInit(); if(a&&a.state==='suspended') a.resume(); bgmSync(); }
 ['pointerdown','touchstart','keydown'].forEach(ev=>
   document.addEventListener(ev, audioUnlock, {passive:true}));
 
@@ -453,6 +455,97 @@ function tone(t0,peak,decay,type,f1,f2,attack){
 }
 // 同じ音が重なりすぎないよう最短間隔をあける（発射・撃破は毎フレーム起こりうる）
 const sndLast={}, SND_GAP={bow:45, gun:60, kill:35, fall:70, tap:40};
+// ================= BGM =================
+// 音声ファイルは使わず、効果音と同じくWeb Audioで組み立てる。
+// 利点は容量ゼロだけでなく「波が進むほど速く・厚くなる」を作れること。
+// 陽音階（ヨナ抜き）。使う音は D E G A B。半音を含まないので、和風だが暗くなりすぎない
+const YO = [293.66, 329.63, 392.00, 440.00, 493.88];      // D4 E4 G4 A4 B4
+const YO_LO = [146.83, 164.81, 196.00, 220.00, 246.94];   // 1オクターブ下
+// BGMの音量。効果音より控えめに保つ。大きすぎ/小さすぎならこの2つを直す
+const BGM_VOL_CALM=0.85, BGM_VOL_BATTLE=0.55;
+let bgmMode=null, bgmTimer=null, bgmNext=0, bgmStep=0, bgmWave=1;
+
+function bgmNote(t,f,gain,dur,type){                       // 旋律の1音（別バスへ流す）
+  const o=actx.createOscillator(); o.type=type||'triangle';
+  o.frequency.setValueAtTime(f,t);
+  const g=actx.createGain();
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.linearRampToValueAtTime(gain,t+0.03);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  o.connect(g); g.connect(bgmBus); o.start(t); o.stop(t+dur+0.05);
+}
+function bgmTaiko(t,gain){                                 // 太鼓の一打
+  const o=actx.createOscillator(); o.type='sine';
+  o.frequency.setValueAtTime(104,t);
+  o.frequency.exponentialRampToValueAtTime(56,t+0.26);
+  const g=actx.createGain();
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.linearRampToValueAtTime(gain,t+0.006);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+0.30);
+  o.connect(g); g.connect(bgmBus); o.start(t); o.stop(t+0.36);
+  const s=actx.createBufferSource(); s.buffer=noiseBuf; s.loop=true;
+  const f=actx.createBiquadFilter(); f.type='lowpass'; f.frequency.setValueAtTime(900,t);
+  const ng=actx.createGain();
+  ng.gain.setValueAtTime(0.0001,t);
+  ng.gain.linearRampToValueAtTime(gain*0.45,t+0.004);
+  ng.gain.exponentialRampToValueAtTime(0.0001,t+0.09);
+  s.connect(f); f.connect(ng); ng.connect(bgmBus); s.start(t); s.stop(t+0.14);
+}
+// 1拍ぶんを組み立てる。step は通し拍数
+function bgmBeat(t,step){
+  if(bgmMode==='shop'){
+    if(step%4===0) bgmNote(t,YO_LO[0],0.060,3.6,'sine');           // 低い持続音（重ねて途切れさせない）
+    if(step%2===1) bgmNote(t,YO[(step/2|0)%YO.length],0.040,1.6);  // ぽつりと一音
+    return;
+  }
+  // ---- 交戦中：波が進むほど厚く・速くなる ----
+  const w=bgmWave, hard=w>=12, late=w>=17;
+  if(step%4===0) bgmTaiko(t,0.085);                                 // 表拍
+  if(step%4===2) bgmTaiko(t,0.048);
+  if(w>=6 && step%8===7) bgmTaiko(t,0.038);                         // 裏の合いの手
+  if(late && step%8===5) bgmTaiko(t,0.034);
+  const m=[0,2,3,2,4,3,2,0];                                        // 短い旋律
+  if(step%2===0) bgmNote(t,YO[m[(step/2|0)%m.length]],0.030,0.34);
+  if(hard && step%4===1) bgmNote(t,YO[m[(step/2|0)%m.length]]*2,0.016,0.20);  // 上の対旋律
+  if(late && step%16===0) bgmNote(t,YO_LO[0],0.045,2.6,'sine');     // 低い唸り
+}
+function bgmSchedule(){
+  if(!actx || !bgmMode) return;
+  const spb = bgmMode==='shop' ? 0.80                                // 備えはゆっくり
+           : 60/(84 + Math.min(48, (bgmWave-1)*2.6)) ;               // 第1波84 → 第20波約133
+  const ahead = actx.currentTime + 0.25;
+  while(bgmNext < ahead){
+    if(bgmNext > actx.currentTime) bgmBeat(bgmNext, bgmStep);
+    bgmNext += spb; bgmStep++;
+  }
+}
+// 局面ごとの曲。決着だけは無音にして、演出を際立たせる
+function bgmSync(){
+  if(!sndOn){ bgmStop(); return; }
+  if(phase==='battle'){ bgmWave=wave; bgmStart('battle'); }
+  else if(phase==='over'){ bgmStop(); }
+  else { bgmStart('shop'); }
+}
+function bgmStart(mode){
+  const a=audioInit(); if(!a) return;
+  if(bgmMode===mode) return;
+  bgmMode=mode; bgmStep=0; bgmNext=a.currentTime+0.12;
+  if(bgmTimer) clearInterval(bgmTimer);
+  bgmTimer=setInterval(bgmSchedule,90);
+  bgmGain(sndOn ? (mode==='shop'?BGM_VOL_CALM:BGM_VOL_BATTLE) : 0);
+}
+function bgmStop(){
+  bgmMode=null;
+  if(bgmTimer){ clearInterval(bgmTimer); bgmTimer=null; }
+  bgmGain(0);
+}
+function bgmGain(v){
+  if(!bgmBus||!actx) return;
+  const t=actx.currentTime;
+  bgmBus.gain.cancelScheduledValues(t);
+  bgmBus.gain.setValueAtTime(bgmBus.gain.value,t);
+  bgmBus.gain.linearRampToValueAtTime(v,t+0.6);              // 切り替えは滑らかに
+}
 function playSE(name){
   if(!sndOn) return;
   const a=audioInit(); if(!a||a.state==='suspended') return;
@@ -521,6 +614,7 @@ function toggleSound(){
   try{ localStorage.setItem(SND_KEY, sndOn?'on':'off'); }catch(e){}
   updateSoundBtns();
   if(sndOn){ audioUnlock(); playSE('build'); }     // 入れた時は手応えを返す
+  bgmSync();
 }
 // 弾は種別を持つ：弓＝白い矢が山なりに飛ぶ／鉄砲＝黒い粒がまっすぐ飛ぶ
 // sx,sy,d0 は見た目（弧と発砲煙）専用。当たり判定は従来どおり x,y の直線追尾なのでバランスは変わらない
@@ -1071,6 +1165,7 @@ g('overTitle').onclick=toTitle;
 // ---------- UI更新 ----------
 function refresh(){
   document.body.classList.toggle('pregame', phase==='opening'||phase==='intro');
+  bgmSync();
   g('gold').textContent=gold;
   g('phase').textContent = phase==='battle'?('第'+wave+'/'+LAST+'波 交戦中')
     : phase==='over'?'決着' : (phase==='intro'||phase==='opening')?'開戦前' : ('第'+wave+'/'+LAST+'波 の備え（櫓 '+towers.length+'基）');
