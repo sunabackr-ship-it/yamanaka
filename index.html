@@ -192,6 +192,17 @@
   .btn small { display:block; opacity:.75; font-size:9px; }
   #start { width:100%; padding:12px; font-size:15px; font-weight:bold; margin-top:2px;
     background:#3f7a3a; color:#fff; border:none; border-radius:6px; cursor:pointer; }
+  /* 主要な操作は常に指の届く場所へ。開戦ボタンと交戦中の操作を画面下に固定する */
+  body:not(.pregame) #start,
+  body:not(.pregame) #battlePanel {
+    position:fixed; left:8px; right:8px; bottom:8px; width:auto; margin:0; z-index:40;
+    box-shadow:0 6px 20px rgba(0,0,0,.55); }
+  body:not(.pregame) #battlePanel {
+    background:#241c10; border:1px solid #6b5a34; border-radius:8px; padding:7px 7px 2px; }
+  body:not(.pregame) #wrap { padding-bottom:74px; }   /* 固定ぶん、下の内容が隠れないように */
+  @supports (padding: max(0px)) {                      /* iPhoneのホームバーを避ける */
+    body:not(.pregame) #start, body:not(.pregame) #battlePanel { bottom:max(8px, env(safe-area-inset-bottom)); }
+  }
   #ffbar .btn { flex:0 0 auto; padding:7px 11px; }
   #drop { flex:1; background:#8a3b2e; color:#fff; border-color:#c25; }
   #drop.dis { opacity:.35; }
@@ -1266,7 +1277,7 @@ function endOpening(){ if(openTimer)clearTimeout(openTimer); g('openOv').classLi
 let entTimers=[];
 // 導入の図の演出。目盛りを1本ずつ出し、数字も一緒に上がる。
 // 北条は4本ですぐ止まり、豊臣は67本続く ― その「長さの差」で兵力差を体感させる
-let figTimer=null, figDelay=null;
+let figTimer=null, figDelay=null, figSafety=null;
 const jpNum = n => { const man=Math.floor(n/10000), sen=(n%10000)/1000;
   return man&&sen ? man+'万'+sen+'千' : man ? man+'万' : sen ? sen+'千' : '0'; };
 // 断面図のアイコン。専用のものが入っていればそれを使い、無ければ従来の記号に戻す
@@ -1286,7 +1297,7 @@ function applyMapIcons(){
     if(tl){ tl.setAttribute('x','48'); tl.setAttribute('y','124'); }
   } else if(ty){ ty.style.display='none'; if(tl){ tl.setAttribute('x','18'); tl.setAttribute('y','118'); } }
 }
-function stopFigAnim(){ if(figTimer){clearInterval(figTimer);figTimer=null;} if(figDelay){clearTimeout(figDelay);figDelay=null;} }
+function stopFigAnim(){ if(figTimer){clearInterval(figTimer);figTimer=null;} if(figDelay){clearTimeout(figDelay);figDelay=null;} if(figSafety){clearTimeout(figSafety);figSafety=null;} }
 function showFigStatic(){          // 動きを控える設定のときは完成形をそのまま出す
   const ov=g('introOv'); if(!ov) return;
   applyMapIcons();
@@ -1316,7 +1327,20 @@ function playFigAnim(){
       if(i>=T.length){ clearInterval(figTimer); figTimer=null; }
     }, 30);
   }, 3200);
+  // 保険：タブが隠れているとCSSアニメーションもタイマーも止まり、opacity:0 のまま
+  // 固まってしまう。演出の所要時間を過ぎたら、走ったかどうかに関わらず完成形にする
+  figSafety=setTimeout(showFigStatic, 7000);
 }
+// 画面に戻ってきたとき、図が出ていなければ完成形にする
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState!=='visible') return;
+  const ov=g('introOv'); if(!ov || !ov.classList.contains('on')) return;
+  const T=ov.querySelectorAll('.mkT');
+  const done=T.length && T[T.length-1].style.opacity==='1';
+  const first=ov.querySelector('.an');
+  const hidden=first && parseFloat(getComputedStyle(first).opacity)<0.5;
+  if(hidden || !done) showFigStatic();
+});
 function introEntrance(){
   const ov=g('introOv'), lg=g('titleLogo');
   entTimers.forEach(clearTimeout); entTimers=[];
