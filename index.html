@@ -429,8 +429,18 @@ function audioInit(){
   return actx;
 }
 // iPad Safariは最初のタップまで音が出ない。最初の操作で解錠する
-function audioUnlock(){ const a=audioInit(); if(a&&a.state==='suspended') a.resume(); bgmSync(); }
-['pointerdown','touchstart','keydown'].forEach(ev=>
+let audioReady=false;
+function audioUnlock(){
+  audioReady=true;
+  const a=audioInit(); if(!a) return;
+  if(a.state==='suspended'){
+    const p=a.resume();                       // resume は非同期。完了してからBGMを始める
+    if(p&&p.then) p.then(()=>{ bgmMode=null; bgmSync(); }).catch(()=>{});
+    else { bgmMode=null; bgmSync(); }
+  } else bgmSync();
+}
+// Androidは click、iOSは touchstart で確実に拾えるよう、主要な操作すべてに繋ぐ
+['pointerdown','touchstart','mousedown','click','keydown'].forEach(ev=>
   document.addEventListener(ev, audioUnlock, {passive:true}));
 
 function env(node,t0,peak,attack,decay){
@@ -521,6 +531,7 @@ function bgmSchedule(){
 }
 // 局面ごとの曲。決着だけは無音にして、演出を際立たせる
 function bgmSync(){
+  if(!audioReady){ return; }        // 最初の操作があるまで音声には触らない
   if(!sndOn){ bgmStop(); return; }
   if(phase==='battle'){ bgmWave=wave; bgmStart('battle'); }
   else if(phase==='over'){ bgmStop(); }
@@ -548,6 +559,7 @@ function bgmGain(v){
 }
 function playSE(name){
   if(!sndOn) return;
+  if(!audioReady) return;
   const a=audioInit(); if(!a||a.state==='suspended') return;
   const now=a.currentTime, ms=performance.now(), gap=SND_GAP[name];
   if(gap){ if(sndLast[name] && ms-sndLast[name]<gap) return; sndLast[name]=ms; }
