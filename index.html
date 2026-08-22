@@ -411,7 +411,7 @@ const RANGE=CELL*2.2, PSPD=7, HIT=8, SPAWN_INT=40;
 // ---------- 音（すべてWeb Audio APIで合成。音源ファイルを持たないので容量ゼロ・権利も自前）----------
 const SND_KEY='yamanaka_sound_v1';
 let sndOn = (function(){ try{ return localStorage.getItem(SND_KEY)!=='off'; }catch(e){ return true; } })();
-let actx=null, sndBus=null, noiseBuf=null, bgmBus=null;
+let actx=null, sndBus=null, noiseBuf=null, bgmBus=null, bgmComp=null;
 function audioInit(){
   if(actx) return actx;
   try{
@@ -420,7 +420,12 @@ function audioInit(){
     actx = new AC();
     sndBus = actx.createGain(); sndBus.gain.value=0.9; sndBus.connect(actx.destination);
     // BGMは効果音とは別系統。効果音が埋もれないよう小さめに保つ
-    bgmBus = actx.createGain(); bgmBus.gain.value=0.0; bgmBus.connect(actx.destination);
+    bgmBus = actx.createGain(); bgmBus.gain.value=0.0;
+    // 太鼓が重なっても割れないように圧縮を挟む
+    bgmComp = actx.createDynamicsCompressor();
+    bgmComp.threshold.value=-16; bgmComp.knee.value=12; bgmComp.ratio.value=8;
+    bgmComp.attack.value=0.003; bgmComp.release.value=0.20;
+    bgmBus.connect(bgmComp); bgmComp.connect(actx.destination);
     // 打撃・破裂・弦に使うホワイトノイズ（1秒ぶんを使い回す）
     noiseBuf = actx.createBuffer(1, actx.sampleRate, actx.sampleRate);
     const d = noiseBuf.getChannelData(0);
@@ -473,7 +478,7 @@ const YO = [293.66, 329.63, 392.00, 440.00, 493.88];      // D4 E4 G4 A4 B4
 const YO_LO = [146.83, 164.81, 196.00, 220.00, 246.94];   // 1オクターブ下
 // BGMの音量。効果音より控えめに保つ。大きすぎ/小さすぎならこの2つを直す
 const BGM_VOL_CALM=0.85, BGM_VOL_BATTLE=0.55;
-let bgmMode=null, bgmTimer=null, bgmNext=0, bgmStep=0, bgmWave=1;
+let bgmMode=null, bgmTimer=null, bgmNext=0, bgmStep=0, bgmWave=1, openLevel=0;
 
 function bgmNote(t,f,gain,dur,type){                       // 旋律の1音（別バスへ流す）
   const o=actx.createOscillator(); o.type=type||'triangle';
@@ -508,6 +513,19 @@ function bgmBeat(t,step){
     if(step%2===1) bgmNote(t,YO[(step/2|0)%YO.length],0.040,1.6);  // ぽつりと一音
     return;
   }
+  if(bgmMode==='opening'){
+    // カット送りに連動して段が上がる。打数を「重ねる」と潰れるので、段ごとに切り替える
+    const L=openLevel;
+    if(step%8===0) bgmNote(t,YO_LO[0]/2,0.060,4.2,'sine');              // 底を支える低音
+    if(L===0){ if(step%8===0) bgmTaiko(t,0.042); }                      // 遠くの一打
+    else if(L===1){ if(step%4===0) bgmTaiko(t,0.052); }
+    else if(L===2){ if(step%2===0) bgmTaiko(t,0.056);
+                    if(step%8===0) bgmNote(t,YO_LO[2],0.040,2.2,'triangle'); }
+    else if(L===3){ bgmTaiko(t,0.052);
+                    if(step%4===0) bgmNote(t,YO_LO[3],0.040,2.0,'triangle'); }
+    else { for(let i=0;i<3;i++) bgmTaiko(t+i*0.17,0.040+i*0.008); }     // 追い込みの連打
+    return;
+  }
   // ---- 交戦中：波が進むほど厚く・速くなる ----
   const w=bgmWave, hard=w>=12, late=w>=17;
   if(step%4===0) bgmTaiko(t,0.085);                                 // 表拍
@@ -521,7 +539,8 @@ function bgmBeat(t,step){
 }
 function bgmSchedule(){
   if(!actx || !bgmMode) return;
-  const spb = bgmMode==='shop' ? 0.80                                // 備えはゆっくり
+  const spb = bgmMode==='opening' ? 0.52                             // オープニングは一定
+           : bgmMode==='shop' ? 0.80                                // 備えはゆっくり
            : 60/(84 + Math.min(48, (bgmWave-1)*2.6)) ;               // 第1波84 → 第20波約133
   const ahead = actx.currentTime + 0.25;
   while(bgmNext < ahead){
@@ -533,9 +552,39 @@ function bgmSchedule(){
 function bgmSync(){
   if(!audioReady){ return; }        // 最初の操作があるまで音声には触らない
   if(!sndOn){ bgmStop(); return; }
-  if(phase==='battle'){ bgmWave=wave; bgmStart('battle'); }
+  if(phase==='opening'){ bgmStart('opening'); }
+  else if(phase==='battle'){ bgmWave=wave; bgmStart('battle'); }
   else if(phase==='over'){ bgmStop(); }
   else { bgmStart('shop'); }
+}
+// タイトルが出る瞬間の一撃。ロゴの着地（約2.05秒）に合わせて鳴らす
+function bgmHit(delaySec){
+  if(!audioReady || !sndOn) return;
+  const a=audioInit(); if(!a) return;
+  const t=a.currentTime+(delaySec||0);
+  bgmGain(BGM_VOL_BATTLE);
+  // 大太鼓
+  const o=a.createOscillator(); o.type='sine';
+  o.frequency.setValueAtTime(150,t); o.frequency.exponentialRampToValueAtTime(44,t+0.9);
+  const g1=a.createGain();
+  g1.gain.setValueAtTime(0.0001,t); g1.gain.linearRampToValueAtTime(0.30,t+0.008);
+  g1.gain.exponentialRampToValueAtTime(0.0001,t+1.6);
+  o.connect(g1); g1.connect(bgmBus); o.start(t); o.stop(t+1.7);
+  // 打面の破裂音
+  const s2=a.createBufferSource(); s2.buffer=noiseBuf; s2.loop=true;
+  const f2=a.createBiquadFilter(); f2.type='lowpass'; f2.frequency.setValueAtTime(1600,t);
+  const g2=a.createGain();
+  g2.gain.setValueAtTime(0.0001,t); g2.gain.linearRampToValueAtTime(0.16,t+0.004);
+  g2.gain.exponentialRampToValueAtTime(0.0001,t+0.5);
+  s2.connect(f2); f2.connect(g2); g2.connect(bgmBus); s2.start(t); s2.stop(t+0.6);
+  // 余韻（鉦のような高い残響）
+  [YO[2],YO[4],YO[2]*2].forEach((f,i)=>{
+    const o3=a.createOscillator(); o3.type='triangle'; o3.frequency.setValueAtTime(f,t);
+    const g3=a.createGain();
+    g3.gain.setValueAtTime(0.0001,t+i*0.02); g3.gain.linearRampToValueAtTime(0.045,t+0.03+i*0.02);
+    g3.gain.exponentialRampToValueAtTime(0.0001,t+2.4);
+    o3.connect(g3); g3.connect(bgmBus); o3.start(t); o3.stop(t+2.5);
+  });
 }
 function bgmStart(mode){
   const a=audioInit(); if(!a) return;
@@ -1371,6 +1420,8 @@ function renderCut(){ const bg=g('openBg'), el=g('openTelop');
     if(typeof IMG_DATA!=='undefined'&&IMG_DATA[key]) bg.style.backgroundImage='url('+IMG_DATA[key]+')';
     bg.style.animation='none'; void bg.offsetWidth; bg.style.animation='kenburns 9s linear forwards';
     bg.style.opacity='1'; el.textContent=TELOP[openIdx]; el.style.opacity='1'; }, 500);
+  openLevel = openIdx;                       // 0→4。カット送りに連動して厚くなる
+  if(bgmMode!=='opening') bgmSync();
   openTimer=setTimeout(()=>{ openIdx++; if(openIdx>=OPCUTS.length) endOpening(); else renderCut(); }, CUT_MS); }
 function startOpening(){ openIdx=0; renderCut(); }
 function playOpening(){ stopFigAnim(); g('introOv').classList.remove('on'); g('openOv').classList.add('on'); phase='opening'; startOpening(); }
@@ -1379,7 +1430,13 @@ g('clearBest').onclick=()=>{
   if(!confirm('この端末に保存された自己ベストと、途中まで進めている戦いを消します。よろしいですか？')) return;
   bestRec={}; saveBest(); clearSave(); updateBestOnButtons();
 };
-function endOpening(){ if(openTimer)clearTimeout(openTimer); g('openOv').classList.remove('on'); g('introOv').classList.add('on'); phase='intro'; updateBestOnButtons(); introEntrance(); }
+function endOpening(){ if(openTimer)clearTimeout(openTimer);
+  bgmStop();                                  // 連打を止めて、一瞬の間を作る
+  bgmHit(0.80);                               // 題字が濃く出そろう頃に「ドーン」（フェードインは約1秒）
+  g('openOv').classList.remove('on'); g('introOv').classList.add('on'); phase='intro';
+  updateBestOnButtons(); introEntrance();
+  setTimeout(()=>{ if(phase==='intro') bgmSync(); }, 2600);   // 余韻が引いてから静かな曲へ
+}
 // オープニング明け：ロゴが画面中央にふわっと現れ、定位置へ上がってから残りの画面が出る
 let entTimers=[];
 // 導入の図の演出。目盛りを1本ずつ出し、数字も一緒に上がる。
